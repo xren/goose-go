@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"goose-go/internal/agent"
+	"goose-go/internal/compaction"
 	"goose-go/internal/conversation"
 	"goose-go/internal/provider"
 	"goose-go/internal/session"
@@ -141,7 +142,7 @@ func TestEvalScenarios(t *testing.T) {
 				msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text(reply))
 				return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
 			},
-		}, agent.ApprovalModeAuto, nil, 4)
+		}, agent.ApprovalModeAuto, nil, 4, 0, compaction.Settings{})
 
 		drainTrace(t, runtime, context.Background(), record.ID, "first prompt")
 		trace := drainTrace(t, runtime, context.Background(), record.ID, "second prompt")
@@ -190,14 +191,116 @@ func TestEvalScenarios(t *testing.T) {
 			t.Fatalf("expected max-turn error in final trace, got %#v", trace[len(trace)-1])
 		}
 	})
+
+	t.Run("threshold_compaction_continuation", func(t *testing.T) {
+		workdir := t.TempDir()
+		store := openEvalStore(t)
+		record := createEvalSession(t, context.Background(), store, workdir)
+
+		for i := 0; i < 6; i++ {
+			if _, err := store.AddMessage(context.Background(), record.ID, conversation.NewMessage(
+				conversation.RoleUser,
+				conversation.Text(strings.Repeat("history ", 20)),
+			)); err != nil {
+				t.Fatalf("seed history: %v", err)
+			}
+		}
+
+		sawCompactedRequest := false
+		runtime := newEvalRuntime(t, store, scriptedProvider{
+			respond: func(req provider.Request) []provider.Event {
+				if req.SystemPrompt != "You are helpful." {
+					msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("summary"))
+					return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+				}
+				if len(req.Messages) > 0 && req.Messages[0].Role == conversation.RoleAssistant {
+					for _, content := range req.Messages[0].Content {
+						if content.Type == conversation.ContentTypeText && content.Text != nil && strings.Contains(content.Text.Text, "Compacted session summary") {
+							sawCompactedRequest = true
+						}
+					}
+				}
+				msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("continued after compaction"))
+				return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+			},
+		}, agent.ApprovalModeAuto, nil, 4, 120, compaction.Settings{Enabled: true, ReserveTokens: 20, KeepRecentTokens: 20})
+
+		trace := drainTrace(t, runtime, context.Background(), record.ID, "continue")
+
+		assertContainsTypes(t, trace, "compaction_started", "compaction_completed", "assistant_message_complete", "run_completed")
+		assertFinalType(t, trace, "run_completed")
+		if !sawCompactedRequest {
+			t.Fatal("expected provider request to use compacted active context")
+		}
+	})
+
+	t.Run("resume_after_prior_compaction", func(t *testing.T) {
+		workdir := t.TempDir()
+		store := openEvalStore(t)
+		record := createEvalSession(t, context.Background(), store, workdir)
+
+		var keptID string
+		for i := 0; i < 4; i++ {
+			msg := conversation.NewMessage(
+				conversation.RoleUser,
+				conversation.Text("message "+strings.Repeat("x", 20)),
+			)
+			updated, err := store.AddMessage(context.Background(), record.ID, msg)
+			if err != nil {
+				t.Fatalf("seed history: %v", err)
+			}
+			record = updated
+			if i == 2 {
+				keptID = msg.ID
+			}
+		}
+		if keptID == "" {
+			t.Fatal("expected kept message id")
+		}
+		if _, err := store.AppendCompaction(context.Background(), record.ID, session.CompactionParams{
+			Summary:            "Goal: prior work\nProgress: compacted context\nNext Steps: continue",
+			FirstKeptMessageID: keptID,
+			TokensBefore:       999,
+			Trigger:            session.CompactionTriggerThreshold,
+		}); err != nil {
+			t.Fatalf("append compaction: %v", err)
+		}
+
+		sawSummaryMessage := false
+		runtime := newEvalRuntime(t, store, scriptedProvider{
+			respond: func(req provider.Request) []provider.Event {
+				if len(req.Messages) > 0 && req.Messages[0].Role == conversation.RoleAssistant {
+					for _, content := range req.Messages[0].Content {
+						if content.Type == conversation.ContentTypeText && content.Text != nil && strings.Contains(content.Text.Text, "Compacted session summary") {
+							sawSummaryMessage = true
+						}
+					}
+				}
+				msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("saw compacted resume context"))
+				return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+			},
+		}, agent.ApprovalModeAuto, nil, 4, 0, compaction.Settings{})
+
+		trace := drainTrace(t, runtime, context.Background(), record.ID, "resume now")
+
+		assertContainsTypes(t, trace, "assistant_message_complete", "run_completed")
+		assertFinalType(t, trace, "run_completed")
+		if !sawSummaryMessage {
+			t.Fatal("expected resumed provider request to include persisted compaction summary")
+		}
+		if !traceContainsAssistantText(trace, "saw compacted resume context") {
+			t.Fatalf("expected resumed compacted trace to include assistant message, got %#v", trace)
+		}
+	})
 }
 
 type scenario struct {
-	prompt   string
-	provider provider.Provider
-	mode     agent.ApprovalMode
-	approver agent.Approver
-	maxTurns int
+	prompt        string
+	provider      provider.Provider
+	mode          agent.ApprovalMode
+	approver      agent.Approver
+	maxTurns      int
+	contextWindow int
 }
 
 func runScenario(t *testing.T, s scenario) []traceRecord {
@@ -211,7 +314,7 @@ func runScenarioWithContext(t *testing.T, ctx context.Context, s scenario) []tra
 	workdir := t.TempDir()
 	store := openEvalStore(t)
 	record := createEvalSession(t, ctx, store, workdir)
-	runtime := newEvalRuntime(t, store, s.provider, s.mode, s.approver, s.maxTurns)
+	runtime := newEvalRuntime(t, store, s.provider, s.mode, s.approver, s.maxTurns, s.contextWindow, compaction.Settings{})
 	return drainTrace(t, runtime, ctx, record.ID, s.prompt)
 }
 
@@ -283,7 +386,7 @@ func createEvalSession(t *testing.T, ctx context.Context, store *sqlitestore.Sto
 	return record
 }
 
-func newEvalRuntime(t *testing.T, store *sqlitestore.Store, p provider.Provider, mode agent.ApprovalMode, approver agent.Approver, maxTurns int) *agent.Agent {
+func newEvalRuntime(t *testing.T, store *sqlitestore.Store, p provider.Provider, mode agent.ApprovalMode, approver agent.Approver, maxTurns int, contextWindow int, compactionSettings compaction.Settings) *agent.Agent {
 	t.Helper()
 	registry := tools.NewRegistry()
 	if err := registry.Register(shell.New()); err != nil {
@@ -297,9 +400,10 @@ func newEvalRuntime(t *testing.T, store *sqlitestore.Store, p provider.Provider,
 	}
 	runtime, err := agent.New(store, p, registry, agent.Config{
 		SystemPrompt: "You are helpful.",
-		Model:        provider.ModelConfig{Provider: "test", Model: "test-model"},
+		Model:        provider.ModelConfig{Provider: "test", Model: "test-model", ContextWindow: contextWindow},
 		MaxTurns:     maxTurns,
 		ApprovalMode: mode,
+		Compaction:   compactionSettings,
 	}, approver)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)

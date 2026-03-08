@@ -1,0 +1,5 @@
+./diagnostics.go
+./providersmoke.go
+./run.go
+./providersmoke_test.go
+./run_test.go

@@ -56,3 +56,5 @@ Current baseline scenarios:
 - resumed session
 - awaiting approval with no approver
 - max-turn termination
+- threshold compaction continuation
+- resume after prior compaction

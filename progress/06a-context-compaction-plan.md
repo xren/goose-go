@@ -6,7 +6,7 @@ Add context compaction to `goose-go` so long-running sessions can continue withi
 
 ## Status
 
-in_progress
+done
 
 ## Dependencies
 
@@ -226,11 +226,17 @@ Implementation notes:
 - resumed session after prior compaction
 
 Status:
-- in_progress
+- done
 
 Implementation notes:
 - Unit and agent coverage now exist for planner behavior, summary generation, threshold compaction, and overflow recovery.
-- Dedicated eval-harness scenarios for post-compaction continuation and resume-after-compaction still need to be added.
+- `internal/evals/evals_test.go` now covers:
+  - threshold compaction continuation
+  - resume after prior compaction
+- The agent integration now also handles three important edge cases:
+  - persisted summaries count toward future compaction planning
+  - threshold/overflow compaction no longer silently retries unchanged context when the initial cut point would summarize nothing
+  - explicit `Compaction.Enabled=false` configuration is preserved instead of being overwritten by defaults
 
 ## Acceptance Criteria
 
@@ -243,7 +249,6 @@ Implementation notes:
 
 ## Open Questions
 
-- Should compaction artifacts be stored as first-class session records or as synthetic conversation messages plus metadata?
 - Do we want one generic token estimator at first, or provider-aware estimators per provider?
 - Do we want manual compaction in the first slice or only automatic compaction plus later CLI support?
 
@@ -253,3 +258,4 @@ Implementation notes:
 - pi-mono's explicit compaction artifact model fits `goose-go`'s event-driven architecture better.
 - The first `goose-go` implementation should copy pi-mono's explicit checkpointing idea without copying its full tree/branch summarization complexity.
 - Compaction should be implemented before substantial TUI work, because the TUI will need to observe and render compaction events as part of long-running sessions.
+- The first compaction slice is now end-to-end complete: persistence, planning, summarization, agent integration, CLI/trace integration, and eval coverage are all in place.

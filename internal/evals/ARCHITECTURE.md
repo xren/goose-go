@@ -93,6 +93,8 @@ The harness currently covers:
 - resumed session
 - awaiting approval with no approver
 - max-turn termination
+- threshold compaction continuation
+- resume after prior compaction
 
 These all live in [evals_test.go](/Users/rex/projects/goose-go/internal/evals/evals_test.go).
 
@@ -138,7 +140,6 @@ The next eval growth areas are likely:
 
 - richer CLI-facing smoke integration
 - provider-smoke failure-path coverage
-- compaction scenarios
 - broader trace-order assertions
 
 Those should extend this package-local document rather than leaving the design in chat context.

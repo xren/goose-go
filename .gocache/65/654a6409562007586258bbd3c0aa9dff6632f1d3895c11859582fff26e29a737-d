@@ -1,0 +1,4 @@
+./compaction.go
+./summarizer.go
+./compaction_test.go
+./summarizer_test.go

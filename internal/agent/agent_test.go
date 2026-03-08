@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"goose-go/internal/compaction"
 	"goose-go/internal/conversation"
 	"goose-go/internal/provider"
 	"goose-go/internal/session"
@@ -404,6 +405,138 @@ func TestReplyOverflowRecoveryCompactsAndRetries(t *testing.T) {
 	}
 }
 
+func TestReplyThresholdCompactionIncludesPersistedSummaryInPlanning(t *testing.T) {
+	var requests []provider.Request
+	agent, store, record := newTestAgent(t, scriptedProvider{
+		respond: func(req provider.Request) []provider.Event {
+			requests = append(requests, req)
+			if req.SystemPrompt != "You are helpful." {
+				msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("updated summary"))
+				return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+			}
+			msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("done"))
+			return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+		},
+	}, ApprovalModeAuto, nil)
+	agent.config.Model.ContextWindow = 160
+	agent.config.Compaction.ReserveTokens = 20
+	agent.config.Compaction.KeepRecentTokens = 20
+
+	var keptID string
+	for i := 0; i < 3; i++ {
+		msg := conversation.NewMessage(conversation.RoleUser, conversation.Text("small suffix"))
+		if _, err := store.AddMessage(context.Background(), record.ID, msg); err != nil {
+			t.Fatalf("seed history: %v", err)
+		}
+		if i == 1 {
+			keptID = msg.ID
+		}
+	}
+	if _, err := store.AppendCompaction(context.Background(), record.ID, session.CompactionParams{
+		Summary:            strings.Repeat("large summary ", 40),
+		FirstKeptMessageID: keptID,
+		TokensBefore:       999,
+		Trigger:            session.CompactionTriggerThreshold,
+	}); err != nil {
+		t.Fatalf("append compaction: %v", err)
+	}
+
+	result, err := agent.Reply(context.Background(), record.ID, "continue")
+	if err != nil {
+		t.Fatalf("reply: %v", err)
+	}
+	if result.Status != StatusCompleted {
+		t.Fatalf("expected completed status, got %q", result.Status)
+	}
+	if len(requests) != 2 {
+		t.Fatalf("expected one summarizer request plus one provider request, got %d", len(requests))
+	}
+
+	latest, err := store.GetLatestCompaction(context.Background(), record.ID)
+	if err != nil {
+		t.Fatalf("get latest compaction: %v", err)
+	}
+	if latest.Summary != "updated summary" {
+		t.Fatalf("expected latest compaction summary to be refreshed, got %q", latest.Summary)
+	}
+}
+
+func TestReplyThresholdCompactionForcesReductionWhenPlannerWouldSummarizeNothing(t *testing.T) {
+	var requests []provider.Request
+	agent, store, record := newTestAgent(t, scriptedProvider{
+		respond: func(req provider.Request) []provider.Event {
+			requests = append(requests, req)
+			if req.SystemPrompt != "You are helpful." {
+				msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("forced summary"))
+				return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+			}
+			msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("done"))
+			return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+		},
+	}, ApprovalModeAuto, nil)
+	agent.config.Model.ContextWindow = 120
+	agent.config.Compaction.ReserveTokens = 20
+	agent.config.Compaction.KeepRecentTokens = 0
+
+	for i := 0; i < 3; i++ {
+		if _, err := store.AddMessage(context.Background(), record.ID, conversation.NewMessage(
+			conversation.RoleUser,
+			conversation.Text(strings.Repeat("history ", 20)),
+		)); err != nil {
+			t.Fatalf("seed history: %v", err)
+		}
+	}
+
+	result, err := agent.Reply(context.Background(), record.ID, "continue")
+	if err != nil {
+		t.Fatalf("reply: %v", err)
+	}
+	if result.Status != StatusCompleted {
+		t.Fatalf("expected completed status, got %q", result.Status)
+	}
+	if len(requests) != 2 {
+		t.Fatalf("expected forced compaction to produce summarizer request plus provider request, got %d", len(requests))
+	}
+
+	first := requests[1].Messages[0]
+	if first.Role != conversation.RoleAssistant {
+		t.Fatalf("expected compacted summary assistant message first, got %q", first.Role)
+	}
+}
+
+func TestNewPreservesDisabledCompaction(t *testing.T) {
+	store, err := sqlitestore.Open(t.TempDir() + "/sessions.db")
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	registry := tools.NewRegistry()
+	if err := registry.Register(shell.New()); err != nil {
+		t.Fatalf("register shell: %v", err)
+	}
+
+	runtime, err := New(store, scriptedProvider{
+		respond: func(req provider.Request) []provider.Event {
+			_ = req
+			msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("pong"))
+			return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+		},
+	}, registry, Config{
+		SystemPrompt: "You are helpful.",
+		Model:        provider.ModelConfig{Provider: "test", Model: "test-model"},
+		MaxTurns:     1,
+		ApprovalMode: ApprovalModeAuto,
+		Compaction:   compaction.Settings{Enabled: false},
+	}, nil)
+	if err != nil {
+		t.Fatalf("new agent: %v", err)
+	}
+	if runtime.config.Compaction.Enabled {
+		t.Fatalf("expected compaction to stay disabled, got %#v", runtime.config.Compaction)
+	}
+}
+
 func newTestAgent(t *testing.T, p provider.Provider, mode ApprovalMode, approver Approver) (*Agent, session.Store, session.Session) {
 	t.Helper()
 
@@ -430,6 +563,7 @@ func newTestAgent(t *testing.T, p provider.Provider, mode ApprovalMode, approver
 		Model:        provider.ModelConfig{Provider: "test", Model: "test-model"},
 		MaxTurns:     3,
 		ApprovalMode: mode,
+		Compaction:   compaction.DefaultSettings(),
 	}, approver)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)

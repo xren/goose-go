@@ -75,5 +75,6 @@ in_progress
 - The compaction summarizer slice is now complete: `internal/compaction` has an embedded prompt template and a provider-backed summarizer that captures summary text and usage through the normalized provider interface.
 - The compaction planner is now documented in [internal/compaction/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/compaction/ARCHITECTURE.md) so the remaining agent integration work has a package-local design reference.
 - Threshold and overflow compaction are now integrated into `internal/agent`, persisted as explicit compaction artifacts, and exposed through the live event stream and JSONL traces.
-- Remaining compaction work is now mostly validation breadth: add eval coverage for continuation and resume after compaction, rather than building the core runtime path itself.
+- Compaction eval coverage now includes continuation after threshold compaction and resume after a prior compaction artifact.
+- The compaction path now counts persisted summary size during replanning, forces a real reduction when the initial cut point would be a no-op, and preserves explicit compaction disable settings.
 - Architecture docs should stay synchronized with the current runtime shape so fresh agents can start Milestone 06 without reconstructing the current system from code first.

@@ -84,9 +84,6 @@ func New(store session.Store, p provider.Provider, registry *tools.Registry, con
 	if config.ApprovalMode == "" {
 		config.ApprovalMode = ApprovalModeAuto
 	}
-	if !config.Compaction.Enabled && config.Compaction.ReserveTokens == 0 && config.Compaction.KeepRecentTokens == 0 {
-		config.Compaction = compaction.DefaultSettings()
-	}
 	if err := config.validate(); err != nil {
 		return nil, err
 	}
@@ -350,23 +347,29 @@ func (a *Agent) compactForReason(
 		return nil, err
 	}
 
-	preparation, err := compaction.Prepare(candidateMessages, a.config.contextWindow(), a.config.Compaction)
+	tokensBefore := compaction.EstimateConversationTokens(candidateMessages)
+	effectiveWindow := a.config.contextWindow()
+	if latest.ID != "" {
+		summaryTokens := compaction.EstimateMessageTokens(compaction.SummaryMessage(latest))
+		tokensBefore += summaryTokens
+		effectiveWindow -= summaryTokens
+	}
+
+	preparation, err := compaction.Prepare(candidateMessages, effectiveWindow, a.config.Compaction)
 	if err != nil {
 		return nil, fmt.Errorf("prepare compaction: %w", err)
 	}
+	preparation.TokensBefore = tokensBefore
 	if !preparation.NeedsCompaction && reason == session.CompactionTriggerOverflow {
-		cutPoint, cutErr := compaction.FindCutPoint(candidateMessages, a.config.Compaction.KeepRecentTokens)
-		if cutErr != nil {
-			return nil, fmt.Errorf("force overflow compaction cut point: %w", cutErr)
+		preparation, err = forceCompactionPreparation(candidateMessages, tokensBefore, a.config.Compaction.KeepRecentTokens)
+		if err != nil {
+			return nil, fmt.Errorf("force overflow compaction: %w", err)
 		}
-		if cutPoint.FirstKeptIndex > 0 {
-			preparation = compaction.Preparation{
-				NeedsCompaction:     true,
-				TokensBefore:        compaction.EstimateConversationTokens(candidateMessages),
-				FirstKeptMessageID:  cutPoint.FirstKeptMessageID,
-				MessagesToSummarize: append([]conversation.Message(nil), candidateMessages[:cutPoint.FirstKeptIndex]...),
-				KeptMessages:        append([]conversation.Message(nil), candidateMessages[cutPoint.FirstKeptIndex:]...),
-			}
+	}
+	if preparation.NeedsCompaction && len(preparation.MessagesToSummarize) == 0 {
+		preparation, err = forceCompactionPreparation(candidateMessages, tokensBefore, a.config.Compaction.KeepRecentTokens)
+		if err != nil {
+			return nil, fmt.Errorf("force compaction reduction: %w", err)
 		}
 	}
 	if !preparation.NeedsCompaction || len(preparation.MessagesToSummarize) == 0 {
@@ -451,6 +454,38 @@ func compactionCandidates(messages []conversation.Message, latest session.Compac
 		return nil, "", fmt.Errorf("latest compaction first kept message %q not found", latest.FirstKeptMessageID)
 	}
 	return messages[firstKeptIndex:], latest.Summary, nil
+}
+
+func forceCompactionPreparation(messages []conversation.Message, tokensBefore int, keepRecentTokens int) (compaction.Preparation, error) {
+	if len(messages) <= 1 {
+		return compaction.Preparation{}, errors.New("compaction cannot reduce context further")
+	}
+
+	cutPoint, err := compaction.FindCutPoint(messages, keepRecentTokens)
+	if err != nil {
+		return compaction.Preparation{}, err
+	}
+	if cutPoint.FirstKeptIndex <= 0 {
+		cutPoint.FirstKeptIndex = forceKeptIndex(messages)
+		cutPoint.FirstKeptMessageID = messages[cutPoint.FirstKeptIndex].ID
+	}
+
+	return compaction.Preparation{
+		NeedsCompaction:     true,
+		TokensBefore:        tokensBefore,
+		FirstKeptMessageID:  cutPoint.FirstKeptMessageID,
+		MessagesToSummarize: append([]conversation.Message(nil), messages[:cutPoint.FirstKeptIndex]...),
+		KeptMessages:        append([]conversation.Message(nil), messages[cutPoint.FirstKeptIndex:]...),
+	}, nil
+}
+
+func forceKeptIndex(messages []conversation.Message) int {
+	for i := len(messages) - 1; i > 0; i-- {
+		if messages[i].Role == conversation.RoleUser {
+			return i
+		}
+	}
+	return len(messages) - 1
 }
 
 func (c Config) contextWindow() int {

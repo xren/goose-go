@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"goose-go/internal/agent"
+	"goose-go/internal/compaction"
 	"goose-go/internal/conversation"
 	"goose-go/internal/provider"
 	"goose-go/internal/provider/openaicodex"
@@ -122,6 +123,7 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 			Provider: "openai-codex",
 			Model:    "gpt-5-codex",
 		},
+		Compaction:   compaction.DefaultSettings(),
 		MaxTurns:     opts.MaxTurns,
 		ApprovalMode: approvalMode,
 	}, approver)
