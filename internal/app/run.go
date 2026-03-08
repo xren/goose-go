@@ -86,7 +86,7 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 	}
 	p, err := newRunProvider(debugOut)
 	if err != nil {
-		return fmt.Errorf("create openai-codex provider: %w", err)
+		return diagnoseRunError("openai-codex", fmt.Errorf("create openai-codex provider: %w", err), opts.DebugProvider)
 	}
 
 	registry := tools.NewRegistry()
@@ -135,7 +135,7 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 
 	stream, err := runtime.ReplyStream(ctx, record.ID, prompt)
 	if err != nil {
-		return err
+		return diagnoseRunError("openai-codex", err, opts.DebugProvider)
 	}
 
 	renderer := newEventRenderer(out)
@@ -169,7 +169,10 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 	if errors.Is(finalErr, agent.ErrMaxTurnsExceeded) {
 		return finalErr
 	}
-	return finalErr
+	if finalErr != nil {
+		return diagnoseRunError("openai-codex", finalErr, opts.DebugProvider)
+	}
+	return nil
 }
 
 type traceWriter struct {

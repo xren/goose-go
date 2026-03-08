@@ -266,6 +266,94 @@ func TestRunAgentWritesTraceFile(t *testing.T) {
 	}
 }
 
+func TestRunAgentClassifiesAuthMissing(t *testing.T) {
+	originalProviderFactory := newRunProvider
+	originalStoreOpener := openRunStore
+	t.Cleanup(func() {
+		newRunProvider = originalProviderFactory
+		openRunStore = originalStoreOpener
+	})
+
+	newRunProvider = func(_ io.Writer) (provider.Provider, error) {
+		return nil, errors.New("codex auth file not found at /tmp/auth.json; run `codex login`")
+	}
+
+	var out bytes.Buffer
+	err := RunAgent(context.Background(), strings.NewReader(""), &out, "ping", RunOptions{
+		WorkingDir: t.TempDir(),
+		DBPath:     t.TempDir() + "/sessions.db",
+	})
+	var diag *DiagnosticError
+	if !errors.As(err, &diag) {
+		t.Fatalf("expected diagnostic error, got %T", err)
+	}
+	if diag.Category != DiagnosticAuthMissing {
+		t.Fatalf("expected auth_missing, got %q", diag.Category)
+	}
+}
+
+func TestRunAgentClassifiesProviderHTTPError(t *testing.T) {
+	originalProviderFactory := newRunProvider
+	originalStoreOpener := openRunStore
+	t.Cleanup(func() {
+		newRunProvider = originalProviderFactory
+		openRunStore = originalStoreOpener
+	})
+
+	newRunProvider = func(_ io.Writer) (provider.Provider, error) {
+		return scriptedAppProvider{
+			respond: func(_ provider.Request) []provider.Event {
+				return []provider.Event{
+					{Type: provider.EventTypeError, Err: errors.New("codex request failed: status 401: nope")},
+				}
+			},
+		}, nil
+	}
+
+	var out bytes.Buffer
+	err := RunAgent(context.Background(), strings.NewReader(""), &out, "ping", RunOptions{
+		WorkingDir: t.TempDir(),
+		DBPath:     t.TempDir() + "/sessions.db",
+	})
+	var diag *DiagnosticError
+	if !errors.As(err, &diag) {
+		t.Fatalf("expected diagnostic error, got %T", err)
+	}
+	if diag.Category != DiagnosticProviderHTTP {
+		t.Fatalf("expected provider_http_error, got %q", diag.Category)
+	}
+}
+
+func TestRunAgentClassifiesEmptyProviderResponse(t *testing.T) {
+	originalProviderFactory := newRunProvider
+	originalStoreOpener := openRunStore
+	t.Cleanup(func() {
+		newRunProvider = originalProviderFactory
+		openRunStore = originalStoreOpener
+	})
+
+	newRunProvider = func(_ io.Writer) (provider.Provider, error) {
+		return scriptedAppProvider{
+			respond: func(_ provider.Request) []provider.Event {
+				return []provider.Event{{Type: provider.EventTypeDone}}
+			},
+		}, nil
+	}
+
+	var out bytes.Buffer
+	err := RunAgent(context.Background(), strings.NewReader(""), &out, "ping", RunOptions{
+		WorkingDir: t.TempDir(),
+		DBPath:     t.TempDir() + "/sessions.db",
+	})
+	var diag *DiagnosticError
+	if !errors.As(err, &diag) {
+		t.Fatalf("expected diagnostic error, got %T", err)
+	}
+	if diag.Category != DiagnosticProviderEmpty {
+		t.Fatalf("expected provider_empty_response, got %q", diag.Category)
+	}
+}
+
 type scriptedAppProvider struct {
 	respond       func(provider.Request) []provider.Event
 	respondStream func(context.Context, provider.Request) <-chan provider.Event

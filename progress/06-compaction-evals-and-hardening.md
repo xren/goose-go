@@ -39,7 +39,7 @@ in_progress
 - [ ] Add context compaction logic
 - [x] Add task eval runner
 - [x] Add regression cases for streaming agent flows
-- [ ] Add architecture and boundary checks
+- [x] Add architecture and boundary checks
 - [x] Add per-session structured logs and transcript artifacts for debugging
 - [x] Add provider smoke coverage and diagnostics for Codex auth/cache failures
 - [ ] Add repo hygiene checks for drift, duplication, or oversized files
@@ -65,6 +65,7 @@ in_progress
 - `internal/app` now records the same event stream into per-session JSONL traces for postmortem debugging and future eval assertions.
 - `make eval` now runs a deterministic scripted harness under `internal/evals` that asserts on trace/event outcomes for baseline runtime scenarios.
 - `provider-smoke` now maps low-level Codex/auth failures into a generic diagnostic model that can be reused by future providers.
+- `internal/archcheck` now holds the stronger dependency rules for auth, provider implementations, storage, evals, and CLI boundaries, with `cmd/archcheck` acting as a thin wrapper.
 - Eval quality will depend on runtime legibility, not only on test count.
 - Runtime diagnostics must cover failures caused by shared external auth state, not only agent-loop logic.
 - Architecture docs should stay synchronized with the current runtime shape so fresh agents can start Milestone 06 without reconstructing the current system from code first.

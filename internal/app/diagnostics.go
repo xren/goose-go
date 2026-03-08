@@ -57,6 +57,21 @@ func diagnoseProviderError(providerName string, err error, debug bool) error {
 	return fmt.Errorf("%s: %w", diag.Error(), diag.Cause)
 }
 
+func diagnoseRunError(providerName string, err error, debug bool) error {
+	if err == nil {
+		return nil
+	}
+
+	diag := classifyProviderError(providerName, err)
+	if diag.Category == DiagnosticUnknown {
+		diag.Summary = "run failed"
+	}
+	if !debug || diag.Cause == nil {
+		return diag
+	}
+	return fmt.Errorf("%s: %w", diag.Error(), diag.Cause)
+}
+
 func classifyProviderError(providerName string, err error) *DiagnosticError {
 	if err == nil {
 		return nil

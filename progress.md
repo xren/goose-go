@@ -30,6 +30,8 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - `goose-go run` now writes per-session JSONL traces from the same event stream under `.goose-go/traces/`.
 - `make eval` now runs a first deterministic trace-based harness over scripted runtime scenarios.
 - `provider-smoke` now classifies failures into normalized diagnostics and preserves low-level causes behind `--debug`.
+- `goose-go run` now classifies provider/auth failures through the same diagnostic model used by `provider-smoke`.
+- `internal/archcheck` now holds the executable boundary rules, with `cmd/archcheck` reduced to a thin entrypoint.
 - `cmd/goose-go sessions` now exposes stored sessions from the session store abstraction.
 - `cmd/goose-go run --session <id>` now resumes an existing session and prints only the new transcript segment.
 - `cmd/goose-go run` now cancels cleanly on `SIGINT` and renders the persisted transcript instead of a raw context error.
@@ -61,6 +63,6 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - The current provider implementation is intentionally narrow: SSE only, no websocket transport, and no broader Responses surface yet.
 - Generic OpenAI API-key provider support is deferred until after the Codex-first slice is stable.
 - Structured file tools beyond `shell` are deferred; if the agent loop becomes too opaque or too permissive with shell-only execution, that scope cut may need to be revisited.
-- Provider diagnostics are normalized for `provider-smoke`, but the same diagnostic model is not yet reused by the main `run` command.
 - If we stop short of using the event stream for real CLI and eval flows, the TUI work will still end up debugging an unproven integration seam.
 - The current eval harness is intentionally narrow and scripted; it still needs broader scenario coverage and CLI-facing smoke integration.
+- The architecture checks are stronger now, but they still do not cover every intended dependency rule in the repo.

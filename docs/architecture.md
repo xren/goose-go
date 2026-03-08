@@ -41,6 +41,15 @@ These packages define the intended shape of the system. They are architectural t
 - `session` persists state. It should not own agent orchestration rules.
 - `cli` renders and collects terminal interaction. It should not contain core agent logic.
 
+These boundaries are now partially enforced by [internal/archcheck/check.go](/Users/rex/projects/goose-go/internal/archcheck/check.go) and [internal/archcheck/rules.go](/Users/rex/projects/goose-go/internal/archcheck/rules.go), with [cmd/archcheck/main.go](/Users/rex/projects/goose-go/cmd/archcheck/main.go) acting as a thin CLI wrapper:
+
+- production packages may not depend on `cmd/*`
+- production packages may not depend on `internal/evals`
+- `internal/auth` may not depend on app, agent, provider, session, storage, or tools
+- `internal/provider/openaicodex` may not depend on app, agent, session, storage, or tools
+- `internal/storage/sqlite` may not depend on app, agent, auth, provider, or tools
+- `internal/evals` is kept off the app-layer composition path on purpose
+
 ## System Diagram
 
 ```mermaid
@@ -75,6 +84,7 @@ This reflects the current system shape:
 - `internal/agent` now owns a live event stream that both CLI and future TUI layers can consume.
 - `cmd/goose-go run` now renders from that stream through `internal/app`, rather than waiting for a completed transcript.
 - `internal/app` now also records that stream into per-session trace artifacts for later debugging and eval work.
+- `internal/app` now also owns the normalized user-facing diagnostic model for provider/auth failures across both `run` and `provider-smoke`.
 
 ## Concrete Subsystem Docs
 

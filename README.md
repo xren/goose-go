@@ -96,6 +96,8 @@ go run ./cmd/goose-go provider-smoke --debug
 
 Use `--debug` when you need the low-level cause appended to the concise diagnostic.
 
+The main `goose-go run` path now uses the same diagnostic model for provider/auth failures.
+
 To run the first real agent loop from the CLI:
 
 ```sh

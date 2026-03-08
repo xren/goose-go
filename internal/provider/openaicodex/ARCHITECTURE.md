@@ -184,6 +184,7 @@ This package still returns low-level transport and auth errors.
 User-facing normalization currently happens one layer up in `internal/app`:
 
 - `provider-smoke` maps low-level failures into stable diagnostic categories
+- `run` maps provider/auth failures into the same categories
 - debug mode appends the underlying cause for deeper inspection
 
 That keeps provider internals provider-specific while letting the CLI present a stable error model that can work for future providers too.
