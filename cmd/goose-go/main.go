@@ -32,7 +32,7 @@ func run(args []string) error {
 	case "run":
 		fs := flag.NewFlagSet("run", flag.ContinueOnError)
 		fs.SetOutput(os.Stderr)
-		approve := fs.Bool("approve", false, "prompt before each tool execution")
+		approve := fs.Bool("approve", true, "prompt before each shell execution")
 		debugProvider := fs.Bool("debug-provider", false, "print translated provider request and raw SSE events")
 		sessionID := fs.String("session", "", "resume an existing session by id")
 		if err := fs.Parse(args[1:]); err != nil {
@@ -44,9 +44,10 @@ func run(args []string) error {
 		ctx, stop := signal.NotifyContext(ctx, os.Interrupt)
 		defer stop()
 		return app.RunAgent(ctx, os.Stdin, os.Stdout, prompt, app.RunOptions{
-			Approve:       *approve,
-			DebugProvider: *debugProvider,
-			SessionID:     *sessionID,
+			RequireApproval: true,
+			Approve:         *approve,
+			DebugProvider:   *debugProvider,
+			SessionID:       *sessionID,
 		})
 	case "sessions":
 		fs := flag.NewFlagSet("sessions", flag.ContinueOnError)
@@ -81,7 +82,7 @@ func run(args []string) error {
 		}
 		ctx, cancel := app.RunAgentContext()
 		defer cancel()
-		runtime, err := app.OpenRuntime(os.Stdin, os.Stdout, app.RunOptions{})
+		runtime, err := app.OpenRuntime(os.Stdin, os.Stdout, app.RunOptions{RequireApproval: true})
 		if err != nil {
 			return err
 		}

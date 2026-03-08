@@ -21,7 +21,14 @@ type Runtime struct {
 	agent      *agent.Agent
 	workingDir string
 	traceDir   string
+	provider   string
+	model      string
 }
+
+const (
+	defaultProviderName = "openai-codex"
+	defaultModelName    = "gpt-5-codex"
+)
 
 var newRunProvider = func(debugOut io.Writer) (provider.Provider, error) {
 	if debugOut != nil {
@@ -57,7 +64,7 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 	p, err := newRunProvider(debugOut)
 	if err != nil {
 		_ = store.Close()
-		return nil, diagnoseRunError("openai-codex", fmt.Errorf("create openai-codex provider: %w", err), opts.DebugProvider)
+		return nil, diagnoseRunError(defaultProviderName, fmt.Errorf("create %s provider: %w", defaultProviderName, err), opts.DebugProvider)
 	}
 
 	registry := tools.NewRegistry()
@@ -67,17 +74,19 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 	}
 
 	approvalMode := agent.ApprovalModeAuto
+	if opts.RequireApproval {
+		approvalMode = agent.ApprovalModeApprove
+	}
 	var approver agent.Approver
 	if opts.Approve {
-		approvalMode = agent.ApprovalModeApprove
 		approver = interactiveApprover{in: in, out: out}
 	}
 
 	runtime, err := agent.New(store, p, registry, agent.Config{
 		SystemPrompt: defaultRunSystemPrompt,
 		Model: provider.ModelConfig{
-			Provider:      "openai-codex",
-			Model:         "gpt-5-codex",
+			Provider:      defaultProviderName,
+			Model:         defaultModelName,
 			ContextWindow: openAICodexContextWindow,
 		},
 		Compaction:   compaction.DefaultSettings(),
@@ -99,6 +108,8 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 		agent:      runtime,
 		workingDir: workingDir,
 		traceDir:   traceDir,
+		provider:   defaultProviderName,
+		model:      defaultModelName,
 	}, nil
 }
 
@@ -133,8 +144,24 @@ func (r *Runtime) WorkingDir() string {
 	return r.workingDir
 }
 
+func (r *Runtime) ProviderModel() (string, string) {
+	return r.provider, r.model
+}
+
 func (r *Runtime) ReplyStream(ctx context.Context, sessionID string, prompt string) (<-chan agent.Event, error) {
 	return r.agent.ReplyStream(ctx, sessionID, prompt)
+}
+
+func (r *Runtime) PendingApproval(ctx context.Context, sessionID string) (*agent.ApprovalRequest, error) {
+	return r.agent.PendingApproval(ctx, sessionID)
+}
+
+func (r *Runtime) ResolveApproval(ctx context.Context, sessionID string, decision agent.ApprovalDecision) (agent.Result, error) {
+	return r.agent.ResolveApproval(ctx, sessionID, decision)
+}
+
+func (r *Runtime) ResolveApprovalStream(ctx context.Context, sessionID string, decision agent.ApprovalDecision) (<-chan agent.Event, error) {
+	return r.agent.ResolveApprovalStream(ctx, sessionID, decision)
 }
 
 const openAICodexContextWindow = 128000

@@ -10,6 +10,7 @@ It does not own provider logic, tool execution, or session persistence rules. It
 - TUI state reduction
 - transcript rendering
 - input handling
+- local slash-command handling for runtime metadata
 - runtime event consumption
 - interrupt wiring at the UI layer
 
@@ -26,7 +27,7 @@ This package currently implements the Stage 1 MVP shape:
 - tool, compaction, and failure notices
 - interrupt of the active run
 
-Approval-required runs are surfaced read-only in Stage 1. Interactive approval UI is deferred.
+Shell execution now requires approval on the TUI surface, and approval-required runs are handled inside the TUI through a focused approval panel backed by the existing approval continuation seam in `internal/agent` and `internal/app`.
 
 ## Runtime Diagram
 
@@ -168,7 +169,6 @@ Current transcript replay behavior:
 ## Stage 1 Constraints
 
 - single-column only
-- no interactive approval UI
 - no session picker
 - no slash commands
 - no side panels
@@ -179,7 +179,9 @@ Current implementation detail:
 - `Ctrl-C` quits when idle
 - `Ctrl-C` or `Esc` interrupts the active run when running
 - `Ctrl-D` quits only when idle
-- approval-required runs are surfaced as status plus a system notice
+- shell-triggered approval-required runs open a focused approval panel with allow/deny actions
+- `/model` is handled locally in the TUI and does not start a provider run
+- the TUI root context is now long-lived and cancelable, not capped by a fixed 5-minute deadline
 
 ## Current Gaps
 
@@ -191,8 +193,8 @@ The initial scaffold is intentionally incomplete. Remaining Stage 1 work:
 
 ## Next Steps
 
-The next Stage 1 work after this initial scaffold is:
+Stage 1 is complete. The next TUI work is Stage 2:
 
-1. add stronger TUI smoke coverage around run start, tool activity, and interrupt
-2. document a manual TUI runbook in the repo
-3. then move to Stage 2 UX work only after the reducer and runtime bridge stabilize
+1. session picker / recent-session entry flow
+2. grouped tool rendering and richer command surfaces
+3. registry-backed model selection inside the TUI

@@ -8,6 +8,7 @@ It ties together:
 - the provider boundary
 - the tool registry
 - approval handling
+- approval continuation for paused runs
 - the multi-turn reply loop
 - the live event stream used by CLI and future TUI layers
 
@@ -56,6 +57,26 @@ flowchart LR
     U --> V{"max turns reached?"}
     V -- "no" --> F
     V -- "yes" --> W["run_failed event (max turns)"]
+```
+
+## Approval Continuation Flow
+
+`ReplyStream(...)` handles fresh user input. `ResolveApprovalStream(...)` resumes a paused run from persisted conversation state after a tool approval decision is supplied.
+
+```mermaid
+flowchart LR
+    A["TUI / app"] --> B["Agent.PendingApproval"]
+    B --> C["read persisted conversation"]
+    C --> D["extract unresolved tool calls"]
+
+    A --> E["Agent.ResolveApprovalStream"]
+    E --> F["load session"]
+    F --> G["resolve first pending tool call"]
+    G --> H["persist tool response"]
+    H --> I{"more pending calls?"}
+    I -- "yes" --> J["approval_required event + awaiting_approval result"]
+    I -- "no" --> K["resume runTurns(...)"]
+    K --> L["normal provider/tool loop"]
 ```
 
 ## Event Stream Flow
@@ -123,6 +144,7 @@ The first loop is intentionally narrow:
 - tool calls are read from normalized assistant message content
 - tool responses are persisted as `tool` role messages
 - approval modes are limited to `auto` and `approve`
+- paused approval runs can now be resumed through explicit continuation APIs without inventing UI-owned runtime state
 - max-turn stopping is enforced by the loop
 
 This is enough to support:

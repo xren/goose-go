@@ -2,8 +2,6 @@ package tui
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -15,7 +13,6 @@ import (
 
 	"goose-go/internal/agent"
 	"goose-go/internal/app"
-	"goose-go/internal/conversation"
 	"goose-go/internal/session"
 )
 
@@ -24,7 +21,10 @@ type Runtime interface {
 	ReplayConversation(ctx context.Context, sessionID string) (session.Session, error)
 	OpenTraceWriter(sessionID string) (app.EventRecorder, error)
 	ReplyStream(ctx context.Context, sessionID string, prompt string) (<-chan agent.Event, error)
+	PendingApproval(ctx context.Context, sessionID string) (*agent.ApprovalRequest, error)
+	ResolveApprovalStream(ctx context.Context, sessionID string, decision agent.ApprovalDecision) (<-chan agent.Event, error)
 	WorkingDir() string
+	ProviderModel() (string, string)
 }
 
 type Options struct {
@@ -50,6 +50,12 @@ type transcriptItem struct {
 	Meta   string
 }
 
+type approvalViewState struct {
+	Request *agent.ApprovalRequest
+	Busy    bool
+	Err     string
+}
+
 type model struct {
 	ctx        context.Context
 	runtime    Runtime
@@ -67,32 +73,16 @@ type model struct {
 	running    bool
 	cancelRun  context.CancelFunc
 	trace      app.EventRecorder
+	approval   approvalViewState
 }
-
-type sessionLoadedMsg struct {
-	session session.Session
-}
-
-type sessionLoadFailedMsg struct{ err error }
-
-type runStartedMsg struct {
-	session session.Session
-	trace   app.EventRecorder
-	cancel  context.CancelFunc
-}
-
-type runStartFailedMsg struct{ err error }
-
-type agentEventMsg struct{ event agent.Event }
-
-type traceWriteFailedMsg struct{ err error }
-
-type noOpMsg struct{}
 
 var (
-	headerStyle = lipgloss.NewStyle().Bold(true).Padding(0, 1)
-	statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(0, 1)
-	errorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Padding(0, 1)
+	headerStyle        = lipgloss.NewStyle().Bold(true).Padding(0, 1)
+	statusStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(0, 1)
+	errorStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Padding(0, 1)
+	approvalPanelStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("220")).Padding(0, 1)
+	approvalTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("220"))
+	approvalErrorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 )
 
 func Run(ctx context.Context, in io.Reader, out io.Writer, runtime Runtime, opts Options) error {
@@ -140,6 +130,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.layout()
 		return m, nil
 	case tea.KeyMsg:
+		if m.approval.Request != nil {
+			switch msg.String() {
+			case "ctrl+c", "esc":
+				if m.running && m.cancelRun != nil {
+					m.cancelRun()
+					m.status = "interrupting"
+				}
+				return m, nil
+			case "a", "y":
+				if m.approval.Busy || m.sessionID == "" {
+					return m, nil
+				}
+				m.approval.Busy = true
+				m.approval.Err = ""
+				m.status = "resolving approval"
+				return m, resolveApprovalCmd(m.ctx, m.runtime, m.async, m.sessionID, agent.ApprovalDecisionAllow)
+			case "d", "n":
+				if m.approval.Busy || m.sessionID == "" {
+					return m, nil
+				}
+				m.approval.Busy = true
+				m.approval.Err = ""
+				m.status = "resolving approval"
+				return m, resolveApprovalCmd(m.ctx, m.runtime, m.async, m.sessionID, agent.ApprovalDecisionDeny)
+			}
+		}
+
 		switch msg.String() {
 		case "ctrl+c":
 			if m.running && m.cancelRun != nil {
@@ -155,7 +172,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter":
-			if m.running {
+			if m.running || m.approval.Request != nil {
 				return m, nil
 			}
 			prompt := strings.TrimSpace(m.input.Value())
@@ -163,8 +180,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.errorText = ""
-			m.status = "starting"
 			m.input.SetValue("")
+			if m.handleLocalCommand(prompt) {
+				m.syncViewport()
+				return m, nil
+			}
+			m.status = "starting"
 			return m, startRunCmd(m.ctx, m.runtime, m.async, prompt, m.sessionID)
 		case "ctrl+d":
 			if !m.running {
@@ -178,7 +199,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessionID = msg.session.ID
 		m.workingDir = msg.session.WorkingDir
 		m.items = buildTranscriptFromConversation(msg.session.Conversation)
-		m.status = "idle"
+		m.approval.Request = msg.approval
+		m.approval.Busy = false
+		m.approval.Err = ""
+		if msg.approval != nil {
+			m.status = "awaiting approval"
+		} else {
+			m.status = "idle"
+		}
 		m.syncViewport()
 		return m, nil
 	case sessionLoadFailedMsg:
@@ -192,11 +220,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cancelRun = msg.cancel
 		m.running = true
 		m.status = "running"
+		m.approval = approvalViewState{}
 		m.syncViewport()
 		return m, nil
 	case runStartFailedMsg:
 		m.status = "failed"
 		m.errorText = msg.err.Error()
+		return m, nil
+	case approvalStartedMsg:
+		m.trace = msg.trace
+		m.cancelRun = msg.cancel
+		m.running = true
+		m.status = "running"
+		m.errorText = ""
+		m.syncViewport()
+		return m, nil
+	case approvalStartFailedMsg:
+		m.running = false
+		m.cancelRun = nil
+		m.status = "awaiting approval"
+		m.approval.Busy = false
+		m.approval.Err = msg.err.Error()
 		return m, nil
 	case agentEventMsg:
 		m.applyAgentEvent(msg.event)
@@ -223,8 +267,46 @@ func (m model) View() string {
 	if m.errorText != "" {
 		status += "\n" + errorStyle.Render(m.errorText)
 	}
-	footer := statusStyle.Render("enter submit  esc/ctrl+c interrupt  ctrl+d quit")
-	return lipgloss.JoinVertical(lipgloss.Left, header, cwd, status, m.viewport.View(), m.input.View(), footer)
+	parts := []string{header, cwd, status, m.viewport.View()}
+	if panel := m.approvalPanel(); panel != "" {
+		parts = append(parts, panel)
+	}
+	parts = append(parts, m.input.View(), statusStyle.Render(m.footerText()))
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+}
+
+func (m model) approvalPanel() string {
+	if m.approval.Request == nil {
+		return ""
+	}
+	req := m.approval.Request
+	lines := []string{
+		approvalTitleStyle.Render("Approval required"),
+		fmt.Sprintf("tool: %s", req.ToolCall.Name),
+		fmt.Sprintf("args: %s", compactArgs(req.ToolCall.Arguments)),
+	}
+	if m.sessionID != "" {
+		lines = append(lines, fmt.Sprintf("session: %s", m.sessionID))
+	}
+	if strings.TrimSpace(m.workingDir) != "" {
+		lines = append(lines, fmt.Sprintf("cwd: %s", m.workingDir))
+	}
+	if m.approval.Err != "" {
+		lines = append(lines, approvalErrorStyle.Render(m.approval.Err))
+	}
+	if m.approval.Busy {
+		lines = append(lines, "resolving...")
+	} else {
+		lines = append(lines, "a/y approve  d/n deny")
+	}
+	return approvalPanelStyle.Width(max(40, min(m.width, 120))).Render(strings.Join(lines, "\n"))
+}
+
+func (m model) footerText() string {
+	if m.approval.Request != nil {
+		return "a/y approve  d/n deny  esc/ctrl+c interrupt"
+	}
+	return "enter submit  esc/ctrl+c interrupt  ctrl+d quit"
 }
 
 func (m *model) layout() {
@@ -234,7 +316,14 @@ func (m *model) layout() {
 	headerLines := 3
 	footerLines := 2
 	composerLines := 1
-	bodyHeight := m.height - headerLines - footerLines - composerLines
+	approvalLines := 0
+	if m.approval.Request != nil {
+		approvalLines = 7
+		if m.approval.Err != "" {
+			approvalLines++
+		}
+	}
+	bodyHeight := m.height - headerLines - footerLines - composerLines - approvalLines
 	if bodyHeight < 3 {
 		bodyHeight = 3
 	}
@@ -249,14 +338,7 @@ func (m *model) syncViewport() {
 }
 
 func (m *model) applyAgentEvent(event agent.Event) {
-	if m.trace != nil {
-		if err := m.trace.Write(event); err != nil {
-			select {
-			case m.async <- traceWriteFailedMsg{err: fmt.Errorf("write trace event: %w", err)}:
-			default:
-			}
-		}
-	}
+	m.applyTrace(event)
 
 	switch event.Type {
 	case agent.EventTypeRunStarted:
@@ -302,9 +384,19 @@ func (m *model) applyAgentEvent(event agent.Event) {
 		m.items = append(m.items, transcriptItem{Kind: kindError, Prefix: "system", Text: fmt.Sprintf("compaction failed (%s)", event.CompactionReason)})
 	case agent.EventTypeApprovalRequired:
 		m.status = "awaiting approval"
-		m.items = append(m.items, transcriptItem{Kind: kindSystem, Prefix: "system", Text: "approval required (interactive approval UI is not available in Stage 1)"})
+		m.running = false
+		m.cancelRun = nil
+		m.approval = approvalViewState{Request: event.ApprovalRequest}
+	case agent.EventTypeApprovalResolved:
+		m.approval.Busy = false
+		m.approval.Err = ""
+		m.approval.Request = nil
 	case agent.EventTypeRunCompleted:
-		m.finishRun(runtimeResultStatus(event.Result))
+		if event.Result != nil && event.Result.Status == agent.StatusAwaitingApproval {
+			m.finishRun("awaiting approval")
+		} else {
+			m.finishRun(runtimeResultStatus(event.Result))
+		}
 	case agent.EventTypeRunInterrupted:
 		m.items = append(m.items, transcriptItem{Kind: kindSystem, Prefix: "system", Text: "interrupted"})
 		m.finishRun("interrupted")
@@ -312,17 +404,22 @@ func (m *model) applyAgentEvent(event agent.Event) {
 		m.items = append(m.items, transcriptItem{Kind: kindError, Prefix: "error", Text: errorText(event.Err)})
 		m.finishRun("failed")
 	}
+	m.layout()
 	m.syncViewport()
 }
 
-func (m *model) finishRun(status string) {
-	m.running = false
-	m.cancelRun = nil
-	m.status = status
-	if m.trace != nil {
-		_ = m.trace.Close()
-		m.trace = nil
+func (m *model) handleLocalCommand(prompt string) bool {
+	providerName, modelName := m.runtime.ProviderModel()
+	cmd, ok := app.LocalCommand(prompt, providerName, modelName)
+	if !ok {
+		return false
 	}
+	m.status = "idle"
+	m.items = append(m.items,
+		transcriptItem{Kind: kindSystem, Prefix: "system", Text: prompt},
+		transcriptItem{Kind: kindSystem, Prefix: "system", Text: cmd.Output},
+	)
+	return true
 }
 
 func (m *model) upsertLiveAssistant(delta string) {
@@ -337,194 +434,4 @@ func (m *model) clearLiveAssistant() {
 	if len(m.items) > 0 && m.items[len(m.items)-1].Kind == kindLiveBuffer {
 		m.items = m.items[:len(m.items)-1]
 	}
-}
-
-func loadSessionCmd(ctx context.Context, runtime Runtime, sessionID string) tea.Cmd {
-	return func() tea.Msg {
-		session, err := runtime.ReplayConversation(ctx, sessionID)
-		if err != nil {
-			return sessionLoadFailedMsg{err: err}
-		}
-		return sessionLoadedMsg{session: session}
-	}
-}
-
-func startRunCmd(ctx context.Context, runtime Runtime, async chan tea.Msg, prompt string, sessionID string) tea.Cmd {
-	return func() tea.Msg {
-		record, _, err := runtime.LoadOrCreateSession(ctx, prompt, sessionID)
-		if err != nil {
-			return runStartFailedMsg{err: err}
-		}
-		trace, err := runtime.OpenTraceWriter(record.ID)
-		if err != nil {
-			return runStartFailedMsg{err: err}
-		}
-		runCtx, cancel := context.WithCancel(ctx)
-		stream, err := runtime.ReplyStream(runCtx, record.ID, prompt)
-		if err != nil {
-			_ = trace.Close()
-			cancel()
-			return runStartFailedMsg{err: err}
-		}
-		go bridgeStream(async, runCtx, stream)
-		return runStartedMsg{session: record, trace: trace, cancel: cancel}
-	}
-}
-
-func bridgeStream(async chan tea.Msg, ctx context.Context, stream <-chan agent.Event) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case event, ok := <-stream:
-			if !ok {
-				return
-			}
-			async <- agentEventMsg{event: event}
-		}
-	}
-}
-
-func waitForAsync(async <-chan tea.Msg) tea.Cmd {
-	return func() tea.Msg {
-		msg, ok := <-async
-		if !ok {
-			return noOpMsg{}
-		}
-		return msg
-	}
-}
-
-func buildTranscriptFromConversation(conv conversation.Conversation) []transcriptItem {
-	items := make([]transcriptItem, 0, len(conv.Messages))
-	for _, message := range conv.Messages {
-		appendMessageItems(&items, message)
-	}
-	return items
-}
-
-func appendMessageItems(items *[]transcriptItem, message conversation.Message) {
-	for _, content := range message.Content {
-		switch content.Type {
-		case conversation.ContentTypeText:
-			if content.Text == nil {
-				continue
-			}
-			prefix := string(message.Role)
-			kind := kindSystem
-			switch message.Role {
-			case conversation.RoleUser:
-				kind = kindUser
-			case conversation.RoleAssistant:
-				kind = kindAssistant
-			case conversation.RoleTool:
-				kind = kindTool
-			}
-			*items = append(*items, transcriptItem{Kind: kind, Prefix: prefix, Text: content.Text.Text})
-		case conversation.ContentTypeToolRequest:
-			if content.ToolRequest == nil {
-				continue
-			}
-			*items = append(*items, transcriptItem{Kind: kindSystem, Prefix: "assistant requested tool", Text: fmt.Sprintf("%s %s", content.ToolRequest.Name, compactArgs(content.ToolRequest.Arguments))})
-		case conversation.ContentTypeToolResponse:
-			if content.ToolResponse == nil {
-				continue
-			}
-			for _, result := range content.ToolResponse.Content {
-				*items = append(*items, transcriptItem{Kind: kindTool, Prefix: "tool", Text: result.Text})
-			}
-		case conversation.ContentTypeSystemNotification:
-			if content.SystemNotification == nil {
-				continue
-			}
-			*items = append(*items, transcriptItem{Kind: kindSystem, Prefix: "system", Text: content.SystemNotification.Message})
-		}
-	}
-}
-
-func renderItems(items []transcriptItem, width int) string {
-	lines := make([]string, 0, len(items))
-	for _, item := range items {
-		prefix := item.Prefix
-		if prefix == "" {
-			prefix = string(item.Kind)
-		}
-		text := strings.TrimRight(item.Text, "\n")
-		if text == "" {
-			text = ""
-		}
-		parts := strings.Split(text, "\n")
-		for i, part := range parts {
-			if i == 0 {
-				lines = append(lines, fmt.Sprintf("%s> %s", prefix, part))
-				continue
-			}
-			lines = append(lines, fmt.Sprintf("%s  %s", strings.Repeat(" ", len(prefix)), part))
-		}
-		if len(parts) == 0 {
-			lines = append(lines, prefix+"> ")
-		}
-	}
-	content := strings.Join(lines, "\n")
-	if width > 0 {
-		return lipgloss.NewStyle().Width(width).Render(content)
-	}
-	return content
-}
-
-func compactArgs(raw json.RawMessage) string {
-	if len(strings.TrimSpace(string(raw))) == 0 {
-		return "{}"
-	}
-	var value any
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return string(raw)
-	}
-	data, err := json.Marshal(value)
-	if err != nil {
-		return string(raw)
-	}
-	return string(data)
-}
-
-func runtimeResultStatus(result *agent.Result) string {
-	if result == nil {
-		return "idle"
-	}
-	return appRuntimeStatus(result.Status)
-}
-
-func appRuntimeStatus(status agent.Status) string {
-	switch status {
-	case agent.StatusCompleted:
-		return "completed"
-	case agent.StatusAwaitingApproval:
-		return "awaiting approval"
-	default:
-		if strings.TrimSpace(string(status)) == "" {
-			return "idle"
-		}
-		return string(status)
-	}
-}
-
-func errorText(err error) string {
-	if err == nil {
-		return "run failed"
-	}
-	var diag *app.DiagnosticError
-	if errors.As(err, &diag) {
-		return diag.Error()
-	}
-	if errors.Is(err, agent.ErrMaxTurnsExceeded) {
-		return "max turns exceeded"
-	}
-	return err.Error()
-}
-
-func fallback(value string, defaultValue string) string {
-	if strings.TrimSpace(value) == "" {
-		return defaultValue
-	}
-	return value
 }

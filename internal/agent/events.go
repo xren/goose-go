@@ -1,9 +1,6 @@
 package agent
 
 import (
-	"context"
-	"errors"
-
 	"goose-go/internal/conversation"
 	"goose-go/internal/session"
 	"goose-go/internal/tools"
@@ -47,39 +44,6 @@ type Event struct {
 	ApprovalDecision ApprovalDecision          `json:"approval_decision,omitempty"`
 	Result           *Result                   `json:"result,omitempty"`
 	Err              error                     `json:"-"`
-}
-
-func (a *Agent) ReplyStream(ctx context.Context, sessionID string, userText string) (<-chan Event, error) {
-	events := make(chan Event, 32)
-	go func() {
-		defer close(events)
-
-		result, err := a.reply(ctx, sessionID, userText, func(event Event) {
-			select {
-			case events <- event:
-			case <-ctx.Done():
-			}
-		})
-
-		terminalEvent := Event{
-			SessionID: sessionID,
-			Result:    resultOrNil(result),
-		}
-		switch {
-		case err == nil:
-			terminalEvent.Type = EventTypeRunCompleted
-		case errors.Is(err, context.Canceled):
-			terminalEvent.Type = EventTypeRunInterrupted
-			terminalEvent.Err = err
-		default:
-			terminalEvent.Type = EventTypeRunFailed
-			terminalEvent.Err = err
-		}
-
-		events <- terminalEvent
-	}()
-
-	return events, nil
 }
 
 func resultOrNil(result Result) *Result {

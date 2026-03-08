@@ -32,18 +32,27 @@ type storeCloser interface {
 }
 
 type RunOptions struct {
-	Approve       bool
-	DebugProvider bool
-	WorkingDir    string
-	DBPath        string
-	TraceDir      string
-	MaxTurns      int
-	SessionID     string
+	RequireApproval bool
+	Approve         bool
+	DebugProvider   bool
+	WorkingDir      string
+	DBPath          string
+	TraceDir        string
+	MaxTurns        int
+	SessionID       string
 }
 
 func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, opts RunOptions) error {
 	if strings.TrimSpace(prompt) == "" {
 		return errors.New("prompt is required")
+	}
+
+	if cmd, ok := LocalCommand(prompt, defaultProviderName, defaultModelName); ok {
+		_, err := fmt.Fprintf(out, "system> /%s\nsystem> %s\n", cmd.Name, strings.ReplaceAll(cmd.Output, "\n", "\nsystem> "))
+		if err != nil {
+			return fmt.Errorf("write local command output: %w", err)
+		}
+		return nil
 	}
 
 	runtime, err := OpenRuntime(in, out, opts)
@@ -329,7 +338,7 @@ func ListSessions(ctx context.Context, out io.Writer, opts RunOptions) error {
 }
 
 func RunAgentContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 5*time.Minute)
+	return context.WithCancel(context.Background())
 }
 
 type interactiveApprover struct {

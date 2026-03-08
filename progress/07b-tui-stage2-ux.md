@@ -2,13 +2,21 @@
 
 ## Objective
 
-Expand the minimal Bubble Tea MVP into a more useful coding interface without violating the headless runtime boundary.
+Expand the Stage 1 Bubble Tea MVP into a meaningfully more productive coding interface without violating the headless runtime boundary.
 
-This stage is where the TUI becomes meaningfully more productive, closer in spirit to `pi-mono`, while still staying native to Go and the current `goose-go` architecture.
+Stage 2 is not about visual polish first. It is about closing the main usability gaps that still force users back to the plain CLI:
+
+- approval interaction
+- session selection without manual ids
+- grouped tool output
+- richer in-TUI session controls
+- in-TUI model selection backed by a local registry rather than hard-coded constants
+
+This stage should move `goose-go` closer in spirit to `pi-mono`'s interactive coding UX while staying native to Go and preserving the current event-driven runtime architecture.
 
 ## Status
 
-planned
+in_progress
 
 ## Dependencies
 
@@ -17,129 +25,257 @@ planned
 
 ## Scope In
 
-- session picker/resume UX
-- approval interaction UI
-- richer tool rendering
-- status/footer panes
-- slash commands or command palette
-- compaction visibility
-- better error surfaces
-- transcript scrolling and navigation
+- approval interaction flow in the TUI
+- session picker / recent-session entry UX
+- richer grouped tool rendering
+- better status and footer surfaces
+- slash commands or a command palette for session actions
+- compaction visibility beyond simple transcript notices
+- model registry and model-selection UI
+- stronger TUI reducer and smoke coverage for the richer flows
 
 ## Scope Out
 
 - server or desktop surfaces
 - branch/session tree UX
-- extension/plugin-defined UI panels
+- plugin-defined UI panels
 - advanced theme system
 - non-terminal frontends
+- broad `pi-mono` feature parity
 
-## Checklist
+## Critical Constraint
 
-- [ ] Add session picker or recent-session view
-- [ ] Add approval interaction flow in the TUI
-- [ ] Add richer tool rendering with collapsible or grouped output
-- [ ] Add footer/status line with session and runtime state
-- [ ] Add slash commands or a command palette
-- [ ] Add compaction notices/history surfaces
-- [ ] Add navigation and transcript scrolling improvements
-- [ ] Add stronger TUI smoke and reducer coverage
+Stage 2 cannot start with view work alone.
 
-## Stage 2 Focus
+The current runtime path returns `StatusAwaitingApproval` and ends the run when approval is required. That is enough for Stage 1 read-only visibility, but it is not enough for an interactive approval modal.
 
-Stage 2 is where the TUI becomes meaningfully useful for repeated coding sessions. The goal is not visual novelty; it is operational clarity.
+So Stage 2 must begin with a runtime/app seam that lets the TUI resolve an approval and continue the run without dropping back to a different surface.
 
-Recommended priorities:
+That means Phase 0 is a runtime integration phase, not a styling phase.
 
-1. approval interaction
-2. session picker
-3. richer tool rendering
-4. slash commands
-5. navigation improvements
+## Priority Order
 
-That order matters because approval and session selection change the usability of the app more than UI polish.
+1. model registry and runtime selection
+2. session picker / recent sessions
+3. grouped tool rendering
+4. command surface
+5. navigation and status polish
+
+## Proposed Package and Surface Changes
+
+### Runtime / app changes
+
+Likely additions:
+
+- `internal/agent`
+  - explicit approval continuation surface
+  - or a stream-pause / resolver mechanism for pending approvals
+- `internal/app`
+  - TUI-friendly runtime controller around approval and session actions
+  - runtime provider/model selection driven by a local model registry
+  - keep provider/store/agent wiring here, not in the Bubble Tea reducer
+- `internal/models`
+  - built-in provider/model catalog
+  - availability filtering
+
+### TUI changes
+
+Likely state additions inside `internal/tui`:
+
+- approval state
+- session picker state
+- grouped tool-block state
+- command-surface state
+- model-picker state
+
+Keep this inside `internal/tui` first. Avoid premature subpackages unless the reducer/view surface becomes unwieldy.
 
 ## Execution Phases
 
+### Phase 0: Approval runtime seam
+
+Status: done
+
+This phase is required before approval UI.
+
+Tasks:
+
+- design and implement a continuation path for pending approvals
+- avoid ending the run in a way that forces the user to restart the workflow elsewhere
+- keep approval policy in `internal/agent`, not in the TUI
+- make the TUI consume approval requests and send back decisions through `internal/app`
+
+Acceptance:
+
+- the TUI can approve or deny a pending tool request and the run continues in the same interactive surface
+
+Implemented runtime surfaces:
+
+- `internal/agent.PendingApproval(...)`
+- `internal/agent.ResolveApproval(...)`
+- `internal/agent.ResolveApprovalStream(...)`
+- `internal/app.Runtime.PendingApproval(...)`
+- `internal/app.Runtime.ResolveApproval(...)`
+- `internal/app.Runtime.ResolveApprovalStream(...)`
+
+The remaining Stage 2 work now starts after approval UI.
+
 ### Phase 1: Approval UI
 
-- render `approval_required` as a first-class modal or focused panel
-- allow:
-  - approve
-  - deny
-  - maybe inspect tool args before decision
+Status: done
+
+Implemented behavior:
+
+- approval-required runs now open a focused panel inside the TUI
+- the panel shows tool name, structured args, session id, and cwd context
+- `a`/`y` approve and `d`/`n` deny
+- the continuation stays on the same interactive surface through `ResolveApprovalStream(...)`
 
 Acceptance:
 
-- the user can complete approval-required sessions without dropping back to the plain CLI.
+- approval-required runs are usable entirely inside the TUI
 
-### Phase 2: Session entry UX
+### Phase 2: Model registry and selection
 
-- add recent-session list or picker
+System of record:
+
+- [07d-model-registry-and-selection.md](/Users/rex/projects/goose-go/progress/07d-model-registry-and-selection.md)
+
+Tasks:
+
+- add a local built-in model registry
+- refactor runtime selection away from hard-coded provider/model constants
+- add CLI `--provider` and `--model`
+- add a model-listing command
+- persist provider/model in session metadata
+- replace TUI `/model` reporter with a picker backed by the registry
+
+Acceptance:
+
+- provider/model selection works the `pi-mono` way: local catalog first, auth-aware filtering, no live fetches
+- CLI and TUI share the same selection behavior
+- resumed sessions preserve provider/model choice deterministically
+
+### Phase 3: Session entry UX
+
+Tasks:
+
+- add a recent-session picker or home screen
 - support:
-  - open recent session
-  - continue most recent
   - new session
+  - continue most recent
+  - open selected session
+- use existing session APIs, not raw SQLite queries
 
 Acceptance:
 
-- the user no longer needs to pass session ids manually.
+- users no longer need to copy session ids to resume work in the TUI
 
-### Phase 3: Rich tool surfaces
+### Phase 4: Grouped tool rendering
 
-- group tool call + tool result together
-- allow collapse/expand
-- distinguish success/error visually
-- show compaction/system notices separately from transcript text
+Tasks:
+
+- group tool request + execution + result into a single logical block
+- allow collapse / expand
+- distinguish success vs error visually
+- separate tool/system notices from ordinary transcript text more clearly
 
 Acceptance:
 
-- long tool-using runs stay readable.
+- long tool-using runs remain readable without scrolling through a flat append-only transcript
 
-### Phase 4: Command surface
+### Phase 5: Command surface
 
-- add slash commands or command palette for:
+Tasks:
+
+- add slash commands or a command palette for:
   - new
-  - resume
-  - copy/export later if needed
-- keep the command surface runtime-agnostic
+  - recent sessions
+  - reopen current session state if needed
+  - maybe copy/export later
+- keep command handling at the TUI/app layer
+- do not couple command parsing to provider or agent logic
 
 Acceptance:
 
-- users can drive common session actions from inside the TUI.
+- common session actions are available without leaving the TUI
 
-### Phase 5: Navigation and polish
+Current note:
 
-- transcript jump/scroll improvements
-- footer/status improvements
-- clearer failure surfaces
-- modest keyboard shortcuts
+- the first local slash command, `/model`, is now implemented in both `goose-go run` and `goose-go tui`
+- the next step is to replace the static reporter behavior with registry-backed selection
+- approval is now handled directly in the TUI through the approval panel and continuation stream
+- shell execution now requires approval by default on the TUI surface
 
-Acceptance:
+## Approval Architecture Notes
 
-- the UI feels coherent and efficient for daily use.
+This is the highest-risk part of Stage 2.
+
+Rules:
+
+- approval policy stays in `internal/agent`
+- approval transport stays in `internal/app`
+- approval presentation stays in `internal/tui`
+
+Do not:
+
+- make the TUI decide which tools require approval
+- let the TUI call tools directly after approval
+- encode provider-specific assumptions in the approval modal
+
+## Model Selection Notes
+
+Follow the `pi-mono` pattern:
+
+- local built-in model catalog
+- auth-aware filtering
+- UI and CLI selection on top
+- live provider discovery deferred
+
+Do not:
+
+- fetch model lists from OpenAI every time `/model` opens
+- depend on model self-identification for runtime truth
+- keep runtime behavior pinned to hard-coded `gpt-5-codex` constants once this phase starts
+
+## Session Picker Architecture Notes
+
+Use only the session abstraction:
+
+- `ListSessions(...)`
+- `GetSession(...)` / replay through runtime/session APIs
+
+Do not:
+
+- read SQLite tables directly from the TUI
+- couple picker logic to current database schema details
+
+## Tool Rendering Notes
+
+Stage 1 renders tool activity as flat transcript lines. Stage 2 should promote tool activity to first-class grouped UI blocks.
+
+Recommended grouped block shape:
+
+- header: tool name + status
+- args summary
+- result summary or expanded output
+
+Keep grouped tool state reducer-driven. Do not reparse rendered strings.
+
+## Testing Strategy
+
+Stage 2 should add:
+
+1. approval flow tests
+2. model registry and picker tests
+3. session picker tests
+4. grouped tool rendering tests
+5. TUI smoke tests
 
 ## Acceptance Criteria
 
-- The TUI feels meaningfully more usable than the Stage 1 MVP for repeated coding sessions.
-- Tool activity, approval state, and session state are first-class parts of the UI.
-- The richer UI still consumes only normalized runtime events and session APIs, not provider internals.
-
-## Implementation Notes
-
-- This stage should remain event-driven. No direct provider/tool/storage shortcuts.
-- Tool output grouping matters more than visual polish.
-- Approval interaction should be implemented only after the event/state model has proven stable in Stage 1.
-- Avoid `pi-mono`’s full tree/branch UI in this stage.
-- Avoid a custom widget ecosystem until the state/reducer model proves stable.
-
-## Open Questions
-
-- Whether slash commands should be a text protocol in the composer or a separate command surface.
-- Whether session picking belongs inside the TUI home screen or as a pre-launch view.
-
-## Risks
-
-- Stage 2 can sprawl into a redesign if Stage 1 state boundaries are weak.
-- Approval UI can accidentally leak runtime policy into the view layer if not kept behind the existing agent/app boundaries.
-- Session picker UX can drift into persistence-owned logic if the TUI starts querying raw storage structures instead of using session APIs.
+- The TUI can handle approval-required runs without falling back to a different interface.
+- Users can select the runtime model from CLI and inside the TUI without live provider fetches.
+- Users can resume recent sessions without typing raw session ids.
+- Tool activity is grouped and readable as a first-class UI surface.
+- The richer UI still consumes only normalized runtime events, registry data, and session APIs, not provider internals.

@@ -26,10 +26,20 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 
 - Milestone 06 is complete.
 - Milestone 07 is now in progress with the first Bubble Tea TUI scaffold under `internal/tui` and `cmd/goose-go tui`.
+- Stage 1 of Milestone 07 is now complete: the TUI can start runs, resume sessions by id, stream transcript/tool activity, interrupt active runs, and replay persisted history through the shared runtime path.
+- The next TUI work is Stage 2 richer UX, not more Stage 1 plumbing.
+- The detailed Stage 2 plan is now in [progress/07b-tui-stage2-ux.md](/Users/rex/projects/goose-go/progress/07b-tui-stage2-ux.md).
+- The approval continuation seam for Stage 2 is now implemented in `internal/agent` and `internal/app`.
+- The Stage 2 approval UI is now implemented in `internal/tui` on top of the approval continuation seam.
+- Shell execution now requires approval by default on both main user surfaces: `goose-go run` uses inline terminal approval prompts by default, and `goose-go tui` uses the in-app approval panel.
+- The next Stage 2 implementation step is a `pi-mono`-style local model registry and registry-backed model selection.
+- The first local slash command, `/model`, is now implemented in both `goose-go run` and `goose-go tui`, but it still reports hard-coded runtime selection rather than using a registry-backed model system.
+- `goose-go run`, `goose-go sessions`, and `goose-go tui` no longer share a hard 5-minute root context deadline; they now use long-lived cancelable contexts suitable for multi-hour sessions.
 - Milestone 07 is now split into a rollup plus supporting plan files:
   - [progress/07a-tui-stage1-mvp.md](/Users/rex/projects/goose-go/progress/07a-tui-stage1-mvp.md)
   - [progress/07b-tui-stage2-ux.md](/Users/rex/projects/goose-go/progress/07b-tui-stage2-ux.md)
   - [progress/07c-tui-architecture.md](/Users/rex/projects/goose-go/progress/07c-tui-architecture.md)
+  - [progress/07d-model-registry-and-selection.md](/Users/rex/projects/goose-go/progress/07d-model-registry-and-selection.md)
 - The TUI planning files are now populated with the execution plan; implementation should start from `07c` and `07a`, not from the rollup alone.
 - `internal/agent` now exposes a live event stream through `ReplyStream`, and `Reply` is now a wrapper over that streaming runtime.
 - `internal/app` and `cmd/goose-go run` now consume the live agent event stream instead of rendering only after completion.
@@ -52,7 +62,10 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - `internal/repocheck` now closes out the remaining Milestone 06 hardening work with oversized-file checks and local Markdown link validation.
 - Stage 1 TUI work should use Bubble Tea.
 - The initial TUI scaffold now reuses the same runtime/session path as `goose-go run`, and consumes `ReplyStream(...)` directly rather than inventing a separate runtime path.
-- The remaining Stage 1 TUI work is focused on stronger smoke coverage, a manual runbook, and UI stabilization before Stage 2 UX expansion.
+- Stage 1 TUI coverage now includes reducer and scripted smoke tests for replay, run start, streamed assistant output, tool activity, and interrupt behavior.
+- The manual TUI runbook now lives in [README.md](/Users/rex/projects/goose-go/README.md).
+- The next TUI work is Stage 2 UX expansion.
+- Stage 2 planning now explicitly treats approval as a runtime/app integration problem before it becomes a TUI modal problem.
 - Keep `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The first concrete provider is documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.
 - The tools runtime is documented in `internal/tools/ARCHITECTURE.md` so fresh agents can pick up the tool execution model without prior chat context.

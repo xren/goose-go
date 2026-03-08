@@ -1,0 +1,38 @@
+{"recorded_at":"2026-03-08T19:53:29.916808Z","type":"run_started","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002"}
+{"recorded_at":"2026-03-08T19:53:29.918412Z","type":"turn_started","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1}
+{"recorded_at":"2026-03-08T19:53:29.918831Z","type":"user_message_persisted","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","message":{"id":"msg_009b1b565dbab9f4","role":"user","created_at":"2026-03-08T19:53:29.916461Z","content":[{"type":"text","text":{"text":"ok tell me something new"}}]}}
+{"recorded_at":"2026-03-08T19:53:31.117533Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" recently"}
+{"recorded_at":"2026-03-08T19:53:31.118599Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":"Researchers"}
+{"recorded_at":"2026-03-08T19:53:31.119395Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" calls"}
+{"recorded_at":"2026-03-08T19:53:31.12003Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" communicate"}
+{"recorded_at":"2026-03-08T19:53:31.12048Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" whales"}
+{"recorded_at":"2026-03-08T19:53:31.120938Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" discovered"}
+{"recorded_at":"2026-03-08T19:53:31.121324Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" that"}
+{"recorded_at":"2026-03-08T19:53:31.12252Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" blue"}
+{"recorded_at":"2026-03-08T19:53:31.123045Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" infr"}
+{"recorded_at":"2026-03-08T19:53:31.123686Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":"asonic"}
+{"recorded_at":"2026-03-08T19:53:31.124091Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" using"}
+{"recorded_at":"2026-03-08T19:53:31.124491Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" that"}
+{"recorded_at":"2026-03-08T19:53:31.124876Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" can"}
+{"recorded_at":"2026-03-08T19:53:31.125481Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" travel"}
+{"recorded_at":"2026-03-08T19:53:31.125984Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" over"}
+{"recorded_at":"2026-03-08T19:53:31.128861Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":"1"}
+{"recorded_at":"2026-03-08T19:53:31.12931Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" "}
+{"recorded_at":"2026-03-08T19:53:31.131836Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":","}
+{"recorded_at":"2026-03-08T19:53:31.132903Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":"000"}
+{"recorded_at":"2026-03-08T19:53:31.139713Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" ocean"}
+{"recorded_at":"2026-03-08T19:53:31.140265Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":","}
+{"recorded_at":"2026-03-08T19:53:31.140669Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" across"}
+{"recorded_at":"2026-03-08T19:53:31.141069Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" miles"}
+{"recorded_at":"2026-03-08T19:53:31.14152Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" the"}
+{"recorded_at":"2026-03-08T19:53:31.184101Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" allowing"}
+{"recorded_at":"2026-03-08T19:53:31.184909Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" individuals"}
+{"recorded_at":"2026-03-08T19:53:31.188139Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" to"}
+{"recorded_at":"2026-03-08T19:53:31.191209Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" coordinate"}
+{"recorded_at":"2026-03-08T19:53:31.194848Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" vast"}
+{"recorded_at":"2026-03-08T19:53:31.195578Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" behavior"}
+{"recorded_at":"2026-03-08T19:53:31.196155Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" across"}
+{"recorded_at":"2026-03-08T19:53:31.264268Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":"."}
+{"recorded_at":"2026-03-08T19:53:31.265505Z","type":"provider_text_delta","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"delta":" distances"}
+{"recorded_at":"2026-03-08T19:53:31.325273Z","type":"assistant_message_complete","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","turn":1,"message":{"id":"msg_5d2aa139e72f09cc","role":"assistant","created_at":"2026-03-08T19:53:31.320394Z","content":[{"type":"text","text":{"text":"Researchers recently discovered that blue whales communicate using infrasonic calls that can travel over 1,000 miles across the ocean, allowing individuals to coordinate behavior across vast distances."}}]}}
+{"recorded_at":"2026-03-08T19:53:31.328256Z","type":"run_completed","session_id":"sess_52ebc68fd9b5e5388ea1342a1df97002","result":{"status":"completed","session":{"id":"sess_52ebc68fd9b5e5388ea1342a1df97002","name":"what model are you","working_dir":"/Users/rex/projects/goose-go","type":"terminal","created_at":1772998358,"updated_at":1772999611,"message_count":4,"conversation":{"messages":[{"id":"msg_df7d5de5d678a000","role":"user","created_at":"2026-03-08T19:32:38.539075Z","content":[{"type":"text","text":{"text":"what model are you"}}]},{"id":"msg_495e0066acc9a574","role":"assistant","created_at":"2026-03-08T19:32:39.922589Z","content":[{"type":"text","text":{"text":"I’m a ChatGPT model powered by GPT-4."}}]},{"id":"msg_009b1b565dbab9f4","role":"user","created_at":"2026-03-08T19:53:29.916461Z","content":[{"type":"text","text":{"text":"ok tell me something new"}}]},{"id":"msg_5d2aa139e72f09cc","role":"assistant","created_at":"2026-03-08T19:53:31.320394Z","content":[{"type":"text","text":{"text":"Researchers recently discovered that blue whales communicate using infrasonic calls that can travel over 1,000 miles across the ocean, allowing individuals to coordinate behavior across vast distances."}}]}]}},"turns":1}}

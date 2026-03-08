@@ -31,13 +31,18 @@ in_progress
 - [x] Finalize the TUI architecture plan
 - [x] Complete Stage 1 MVP plan
 - [x] Complete Stage 2 richer UX plan
-- [ ] Implement Stage 1 MVP
+- [x] Implement Stage 1 MVP
 - [ ] Implement Stage 2 richer UX
 
 Current note:
 
-- the initial Stage 1 scaffold is now in the repo under `internal/tui` and `cmd/goose-go tui`
-- the remaining Stage 1 work is focused on stronger smoke coverage, a manual runbook, and UI stabilization
+- the Stage 1 Bubble Tea MVP is now in the repo under `internal/tui` and `cmd/goose-go tui`
+- Stage 2 richer UX remains the next TUI milestone
+- the detailed Stage 2 execution plan now lives in [07b-tui-stage2-ux.md](/Users/rex/projects/goose-go/progress/07b-tui-stage2-ux.md)
+- the first Stage 2 step, the approval continuation seam in `internal/agent` and `internal/app`, is now implemented
+- the Stage 2 approval UI is now implemented in `internal/tui`
+- the next Stage 2 step is the local model-registry and model-selection work tracked in [07d-model-registry-and-selection.md](/Users/rex/projects/goose-go/progress/07d-model-registry-and-selection.md)
+- the first local slash command, `/model`, is now available in both `run` and `tui`, but it is still a static local reporter until the registry-backed model-selection phase lands
 
 ## Acceptance Criteria
 

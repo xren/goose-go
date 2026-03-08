@@ -13,7 +13,7 @@ The Stage 1 goal is not a rich coding environment. It is a thin interactive shel
 
 ## Status
 
-in_progress
+done
 
 ## Dependencies
 
@@ -59,13 +59,13 @@ in_progress
 - [x] Add running/idle/interrupted/failed status handling
 - [x] Add Ctrl-C interrupt behavior for the active run
 - [x] Add a minimal resume entrypoint using session id
-- [ ] Add reducer tests and TUI smoke coverage for start, stream, tool activity, and interrupt
+- [x] Add reducer tests and TUI smoke coverage for start, stream, tool activity, and interrupt
 
 Current note:
 
-- reducer tests are in place for transcript replay and live assistant buffering
-- broader scripted TUI smoke coverage is still pending
-- a manual TUI runbook still needs to be added to the repo
+- reducer and scripted TUI smoke coverage now cover transcript replay, run start, streamed assistant output, tool activity, and interrupt behavior
+- the manual TUI runbook now lives in [README.md](/Users/rex/projects/goose-go/README.md)
+- additional UI polish can happen later without reopening the Stage 1 MVP acceptance criteria
 
 
 ## Stack Rationale

@@ -1,0 +1,4 @@
+{"recorded_at":"2026-03-08T10:23:14.228335Z","type":"run_started","session_id":"sess_3018c10b761d3a11d5807709bd19684f"}
+{"recorded_at":"2026-03-08T10:23:14.229545Z","type":"turn_started","session_id":"sess_3018c10b761d3a11d5807709bd19684f","turn":1}
+{"recorded_at":"2026-03-08T10:23:14.229979Z","type":"user_message_persisted","session_id":"sess_3018c10b761d3a11d5807709bd19684f","message":{"id":"msg_55eb057fb32c0012","role":"user","created_at":"2026-03-08T10:23:14.227376Z","content":[{"type":"text","text":{"text":"/status"}}]}}
+{"recorded_at":"2026-03-08T10:23:15.765211Z","type":"run_failed","session_id":"sess_3018c10b761d3a11d5807709bd19684f","error":"start provider turn: codex request failed: status 429: {\"error\":{\"type\":\"usage_limit_reached\",\"message\":\"The usage limit has been reached\",\"plan_type\":\"plus\",\"resets_at\":1772969718,\"eligible_promo\":null,\"resets_in_seconds\":4323}}"}

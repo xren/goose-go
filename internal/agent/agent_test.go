@@ -80,58 +80,6 @@ func TestReplyToolCallThenFollowup(t *testing.T) {
 	}
 }
 
-func TestReplyAwaitsApprovalWhenNoApprover(t *testing.T) {
-	agent, _, record := newTestAgent(t, scriptedProvider{
-		respond: func(_ provider.Request) []provider.Event {
-			msg := conversation.NewMessage(conversation.RoleAssistant, conversation.ToolRequest("call_1", "shell", []byte(`{"command":"pwd"}`)))
-			return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
-		},
-	}, ApprovalModeApprove, nil)
-
-	result, err := agent.Reply(context.Background(), record.ID, "run pwd")
-	if err != nil {
-		t.Fatalf("reply: %v", err)
-	}
-	if result.Status != StatusAwaitingApproval {
-		t.Fatalf("expected awaiting approval, got %q", result.Status)
-	}
-	if result.PendingApprovalFor == nil || result.PendingApprovalFor.Name != "shell" {
-		t.Fatalf("expected pending shell approval, got %#v", result.PendingApprovalFor)
-	}
-}
-
-func TestReplyDeniedToolContinues(t *testing.T) {
-	agent, store, record := newTestAgent(t, scriptedProvider{
-		respond: func(req provider.Request) []provider.Event {
-			if hasToolResponse(req.Messages) {
-				msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("understood"))
-				return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
-			}
-			msg := conversation.NewMessage(conversation.RoleAssistant, conversation.ToolRequest("call_1", "shell", []byte(`{"command":"pwd"}`)))
-			return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
-		},
-	}, ApprovalModeApprove, ApproverFunc(func(context.Context, ApprovalRequest) (ApprovalDecision, error) {
-		return ApprovalDecisionDeny, nil
-	}))
-
-	result, err := agent.Reply(context.Background(), record.ID, "run pwd")
-	if err != nil {
-		t.Fatalf("reply: %v", err)
-	}
-	if result.Status != StatusCompleted {
-		t.Fatalf("expected completed status, got %q", result.Status)
-	}
-
-	got, err := store.GetSession(context.Background(), record.ID)
-	if err != nil {
-		t.Fatalf("get session: %v", err)
-	}
-	toolMsg := got.Conversation.Messages[2]
-	if toolMsg.Role != conversation.RoleTool || !toolMsg.Content[0].ToolResponse.IsError {
-		t.Fatalf("expected denied tool response, got %#v", toolMsg)
-	}
-}
-
 func TestReplyReturnsMaxTurnsExceeded(t *testing.T) {
 	agent, _, record := newTestAgent(t, scriptedProvider{
 		respond: func(_ provider.Request) []provider.Event {

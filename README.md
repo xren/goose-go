@@ -109,10 +109,18 @@ To run the first real agent loop from the CLI:
 go run ./cmd/goose-go run "list my home directory"
 ```
 
-To require approval before each tool execution:
+To ask the runtime which provider/model is configured without hitting the provider:
 
 ```sh
-go run ./cmd/goose-go run --approve "list my home directory"
+go run ./cmd/goose-go run "/model"
+```
+
+Shell tool execution now requires approval by default in both `goose-go run` and `goose-go tui`.
+
+For CLI `run`, inline terminal approval prompts are enabled by default. To disable the inline prompt and allow the run to pause instead, use:
+
+```sh
+go run ./cmd/goose-go run --approve=false "list my home directory"
 ```
 
 To list stored sessions:
@@ -134,9 +142,79 @@ go run ./cmd/goose-go tui
 go run ./cmd/goose-go tui --session <session-id>
 ```
 
+Inside the TUI, `/model` is also handled locally and reports the configured provider/model without starting a run.
+
 Press `Ctrl-C` during `goose-go run` to cancel the active run cleanly. The current persisted session state is kept and the CLI renders the transcript captured so far.
 Each `goose-go run` also writes a per-session JSONL trace under `.goose-go/traces/` by default.
 The TUI uses the same runtime/session path and renders from the same live event stream.
+
+## TUI Manual Test Runbook
+
+Use this sequence to manually validate the Stage 1 TUI:
+
+1. Start the TUI:
+```sh
+go run ./cmd/goose-go tui
+```
+Verify:
+- the Bubble Tea screen opens
+- header shows `session: new`
+- status starts as `idle`
+
+2. Submit a simple prompt:
+```text
+Reply with the single word: pong
+```
+Verify:
+- status moves through `starting` to `running`
+- a session id appears
+- the user message is appended
+- the assistant response streams into the transcript
+- status ends at `completed`
+
+3. Exercise tool activity:
+```text
+Use the shell tool to run 'pwd' and explain the result.
+```
+Verify:
+- transcript shows `assistant requested tool ...`
+- transcript shows a `tool[...]` result line
+- final assistant response appears after the tool result
+
+4. Exercise interrupt:
+```text
+Use the shell tool to run 'sleep 10 && echo done'
+```
+Then press `Ctrl-C` or `Esc`.
+Verify:
+- status changes to `interrupting`
+- transcript shows `interrupted`
+- the TUI stays open
+
+5. Exercise resume:
+```sh
+go run ./cmd/goose-go tui --session <session-id>
+```
+Verify:
+- prior transcript is replayed on startup
+- new prompts continue the same session
+
+6. Inspect the trace:
+```sh
+ls .goose-go/traces
+jq . .goose-go/traces/<session-id>.jsonl
+```
+Verify:
+- the TUI run produced the same normalized runtime event trace as `goose-go run`
+
+7. Exercise approval in the TUI:
+```text
+Use the shell tool to run 'pwd' and explain the result.
+```
+Verify:
+- an approval panel opens inside the TUI by default for shell execution
+- `a` or `y` approves and continues the run
+- `d` or `n` denies and keeps the run inside the TUI
 
 ## How A Run Works
 

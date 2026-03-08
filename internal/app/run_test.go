@@ -50,6 +50,33 @@ func TestRunAgentAutoModeRendersTranscript(t *testing.T) {
 	}
 }
 
+func TestRunAgentModelCommandReturnsConfiguredRuntimeModelWithoutStartingSession(t *testing.T) {
+	var out bytes.Buffer
+	err := RunAgent(context.Background(), strings.NewReader(""), &out, "/model", RunOptions{})
+	if err != nil {
+		t.Fatalf("run agent: %v", err)
+	}
+
+	got := out.String()
+	for _, want := range []string{"system> /model", "system> provider: openai-codex", "system> model: gpt-5-codex"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected output to contain %q, got %q", want, got)
+		}
+	}
+	if strings.Contains(got, "session:") {
+		t.Fatalf("expected local command to avoid session creation, got %q", got)
+	}
+}
+
+func TestRunAgentContextHasNoDeadline(t *testing.T) {
+	ctx, cancel := RunAgentContext()
+	defer cancel()
+
+	if _, ok := ctx.Deadline(); ok {
+		t.Fatal("expected run agent context to have no deadline")
+	}
+}
+
 func TestRunAgentApproveModePrompts(t *testing.T) {
 	originalProviderFactory := newRunProvider
 	originalStoreOpener := openRunStore
@@ -72,7 +99,7 @@ func TestRunAgentApproveModePrompts(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	err := RunAgent(context.Background(), strings.NewReader("n\n"), &out, "run pwd", RunOptions{Approve: true, WorkingDir: t.TempDir(), DBPath: t.TempDir() + "/sessions.db"})
+	err := RunAgent(context.Background(), strings.NewReader("n\n"), &out, "run pwd", RunOptions{RequireApproval: true, Approve: true, WorkingDir: t.TempDir(), DBPath: t.TempDir() + "/sessions.db"})
 	if err != nil {
 		t.Fatalf("run agent: %v", err)
 	}
