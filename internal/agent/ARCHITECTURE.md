@@ -27,27 +27,28 @@ It must not absorb provider HTTP logic, tool implementation details, or storage-
 
 ```mermaid
 flowchart LR
-    A["user input"] --> B["Agent.Reply"]
-    B --> C["append user message to session"]
-    C --> D["provider.Request"]
-    D --> E["provider.Stream"]
-    E --> F["final assistant message"]
-    F --> G["persist assistant message"]
-    G --> H{"tool requests?"}
+    A["cmd/goose-go run"] --> B["internal/app.RunAgent"]
+    B --> C["Agent.Reply"]
+    C --> D["append user message to session"]
+    D --> E["provider.Request"]
+    E --> F["provider.Stream"]
+    F --> G["final assistant message"]
+    G --> H["persist assistant message"]
+    H --> I{"tool requests?"}
 
-    H -- "no" --> I["completed"]
-    H -- "yes" --> J["approval check"]
+    I -- "no" --> J["completed"]
+    I -- "yes" --> K["approval check"]
 
-    J -- "pending" --> K["awaiting approval"]
-    J -- "deny" --> L["synthetic denied tool result"]
-    J -- "allow" --> M["tools.Registry.Execute"]
+    K -- "pending" --> L["awaiting approval"]
+    K -- "deny" --> M["synthetic denied tool result"]
+    K -- "allow" --> N["tools.Registry.Execute"]
 
-    M --> N["tool result"]
-    L --> N
-    N --> O["persist tool response as tool-role message"]
-    O --> P{"max turns reached?"}
-    P -- "no" --> D
-    P -- "yes" --> Q["max turns exceeded"]
+    N --> O["tool result"]
+    M --> O
+    O --> P["persist tool response as tool-role message"]
+    P --> Q{"max turns reached?"}
+    Q -- "no" --> E
+    Q -- "yes" --> R["max turns exceeded"]
 ```
 
 ## Package Topology
@@ -116,13 +117,16 @@ That keeps the agent loop simple:
 
 ## Near-Term Growth
 
-The next layer is Milestone 05: expose this loop through the CLI.
+Milestone 05 is now in place:
 
-That means:
+- `cmd/goose-go run` exposes the runtime through a thin app layer
+- sessions can be listed and resumed
+- `SIGINT` cancels the active run cleanly
 
-- creating or loading sessions from `cmd/goose-go`
-- rendering streamed output to the terminal
-- surfacing approval pauses to the user
-- handling interrupts and resume
+The next architecture step is Milestone 06:
 
-The goal is to keep that CLI layer thin. `internal/agent` should remain the only runtime orchestration layer.
+- refactor `internal/agent` to emit a structured live event stream
+- keep `Reply()` and CLI commands as thin adapters over that streaming runtime
+- make live rendering and future TUI work subscribe to agent events instead of polling persistence
+
+`internal/agent` should remain the only runtime orchestration layer even after event streaming lands.

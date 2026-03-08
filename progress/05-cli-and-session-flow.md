@@ -6,7 +6,7 @@ Expose the runtime through a reliable terminal interface and finish the basic se
 
 ## Status
 
-in_progress
+done
 
 ## Dependencies
 
@@ -32,12 +32,12 @@ in_progress
 - [x] Render agent transcript output
 - [x] Add a `sessions` command
 - [x] Add `run --session <id>` resume flow
-- [ ] Handle interrupts and cancellation cleanly
+- [x] Handle interrupts and cancellation cleanly
 - [x] Add CLI smoke tests
 
 ## Acceptance Criteria
 
-- A user can start, inspect, and resume a terminal-core session from the CLI; interrupt handling remains to be added.
+- A user can start, inspect, resume, and interrupt a terminal-core session from the CLI.
 
 ## Open Questions
 
@@ -52,5 +52,5 @@ in_progress
 - The provider replay path now preserves both function-call item IDs and call IDs so multi-turn CLI runs can survive tool use with the Codex backend.
 - The current `run` command is still transcript-after-completion, not a live event-driven UI.
 - `goose-go sessions` now lists stored sessions, and `goose-go run --session <id>` resumes an existing session while printing only the new transcript segment.
-- The remaining work in this milestone is clean interrupt handling.
+- `cmd/goose-go run` now handles `SIGINT` by canceling the active run context and rendering the persisted transcript instead of dumping a raw context error.
 - The next milestone must add a live agent event stream before substantial TUI work begins.

@@ -6,7 +6,7 @@ Refactor the runtime to emit structured live events that both the CLI and a futu
 
 ## Status
 
-planned
+in_progress
 
 ## Dependencies
 
@@ -62,3 +62,4 @@ planned
 - Event streaming should become the source of truth for live rendering; SQLite remains the persistence layer, not the live UI transport.
 - Eval quality will depend on runtime legibility, not only on test count.
 - Runtime diagnostics must cover failures caused by shared external auth state, not only agent-loop logic.
+- Architecture docs should stay synchronized with the current runtime shape so fresh agents can start Milestone 06 without reconstructing the current system from code first.

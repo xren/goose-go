@@ -39,6 +39,7 @@ flowchart LR
     D --> K["internal/storage/sqlite"]
     K --> L[("sessions.db")]
 ```
+```
 
 ## Session Lifecycle
 
@@ -53,6 +54,25 @@ flowchart TD
     F --> G["Add assistant and tool messages"]
     G --> H["updated Session returned"]
     H --> I["ListSessions / GetSession / ReplayConversation"]
+```
+
+## CLI Session Flow
+
+```mermaid
+flowchart LR
+    A["cmd/goose-go sessions"] --> B["internal/app.ListSessions"]
+    B --> C["session.Store.ListSessions"]
+    C --> D["internal/storage/sqlite"]
+
+    E["cmd/goose-go run"] --> F["internal/app.RunAgent"]
+    F --> G{"--session id?"}
+    G -- "no" --> H["CreateSession"]
+    G -- "yes" --> I["GetSession"]
+    H --> J["Agent.Reply"]
+    I --> J
+    J --> K["AddMessage / ReplaceConversation"]
+    K --> D
+```
 ```
 
 ## Core Types
@@ -95,9 +115,10 @@ That implementation:
 
 ## Near-Term Growth
 
-The remaining session-related work in Milestone 05 is:
+Milestone 05 session ergonomics are now in place:
 
-- clean interrupt handling
-- continuing to use `session.Store` as the only CLI/runtime persistence seam
+- `sessions` lists persisted session summaries
+- `run --session <id>` resumes an existing session
+- interrupts preserve persisted state and keep the store boundary intact
 
 Later TUI work should keep using this boundary for session metadata and persisted conversation state, while using a separate live event stream for rendering.

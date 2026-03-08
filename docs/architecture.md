@@ -41,6 +41,39 @@ These packages define the intended shape of the system. They are architectural t
 - `session` persists state. It should not own agent orchestration rules.
 - `cli` renders and collects terminal interaction. It should not contain core agent logic.
 
+## System Diagram
+
+```mermaid
+flowchart LR
+    A["cmd/goose-go"] --> B["internal/app"]
+    B --> C["internal/agent"]
+    B --> D["session.Store"]
+
+    C --> E["internal/provider"]
+    C --> F["internal/tools"]
+    C --> D
+    C --> G["internal/conversation"]
+
+    E --> H["internal/provider/openaicodex"]
+    H --> I["internal/auth/codex"]
+    I --> J["~/.codex/auth.json"]
+
+    F --> K["internal/tools/shell"]
+    D --> L["internal/storage/sqlite"]
+    L --> M[(".goose-go/sessions.db")]
+
+    C -. "Milestone 06" .-> N["agent event stream"]
+    N -. "Milestone 07" .-> O["interactive TUI"]
+```
+
+This reflects the current system shape:
+
+- `cmd/goose-go` and `internal/app` own process-level CLI behavior.
+- `internal/agent` is the runtime control plane.
+- `session.Store` is the persistence seam used by both app and agent.
+- provider, tools, auth, and storage stay behind their package boundaries.
+- the next architecture step is a live agent event stream that both CLI and future TUI layers can consume.
+
 ## Concrete Subsystem Docs
 
 The root architecture doc defines package-level boundaries. Concrete subsystem behavior is documented separately:

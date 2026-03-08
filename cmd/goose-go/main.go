@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
 
 	"goose-go/internal/app"
@@ -11,6 +13,9 @@ import (
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
+		if errors.Is(err, app.ErrInterrupted) {
+			os.Exit(130)
+		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -35,6 +40,8 @@ func run(args []string) error {
 		prompt := strings.Join(fs.Args(), " ")
 		ctx, cancel := app.RunAgentContext()
 		defer cancel()
+		ctx, stop := signal.NotifyContext(ctx, os.Interrupt)
+		defer stop()
 		return app.RunAgent(ctx, os.Stdin, os.Stdout, prompt, app.RunOptions{
 			Approve:       *approve,
 			DebugProvider: *debugProvider,

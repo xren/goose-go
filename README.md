@@ -108,6 +108,8 @@ To resume an existing session:
 go run ./cmd/goose-go run --session <session-id> "continue from here"
 ```
 
+Press `Ctrl-C` during `goose-go run` to cancel the active run cleanly. The current persisted session state is kept and the CLI renders the transcript captured so far.
+
 ## Current State
 
 The repo now has the first runtime foundation in place:
@@ -119,4 +121,4 @@ The repo now has the first runtime foundation in place:
 - a real `openai-codex` provider exists with a minimal runtime smoke path
 - an initial `internal/agent` loop exists for multi-turn replies, tool dispatch, max-turn limits, and approval handling
 
-The current milestone is still the CLI and session flow layer; `run`, `sessions`, and resume now exist, and interrupt handling is the main remaining gap.
+The current milestone is now the event-stream and hardening layer; the basic CLI/session surface is in place, including interrupt handling.

@@ -28,6 +28,8 @@ const (
 	defaultRunDBName       = "sessions.db"
 )
 
+var ErrInterrupted = errors.New("interrupted")
+
 type storeCloser interface {
 	session.Store
 	Close() error
@@ -118,6 +120,9 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 
 	result, err := runtime.Reply(ctx, record.ID, prompt)
 	if err != nil && !errors.Is(err, agent.ErrMaxTurnsExceeded) {
+		if errors.Is(err, context.Canceled) {
+			return renderInterruptedRun(out, store, record.ID, startIndex)
+		}
 		return err
 	}
 
@@ -173,6 +178,23 @@ func ListSessions(ctx context.Context, out io.Writer, opts RunOptions) error {
 
 func RunAgentContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 5*time.Minute)
+}
+
+func renderInterruptedRun(out io.Writer, store session.Store, sessionID string, startIndex int) error {
+	record, err := store.GetSession(context.Background(), sessionID)
+	if err != nil {
+		return ErrInterrupted
+	}
+	if _, err := fmt.Fprintf(out, "session: %s\n", record.ID); err != nil {
+		return fmt.Errorf("write interrupted session header: %w", err)
+	}
+	if err := renderConversationFrom(out, record.Conversation, startIndex); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(out, "interrupted\n"); err != nil {
+		return fmt.Errorf("write interrupted notice: %w", err)
+	}
+	return ErrInterrupted
 }
 
 type interactiveApprover struct {

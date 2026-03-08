@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -161,8 +162,48 @@ func TestListSessions(t *testing.T) {
 	}
 }
 
+func TestRunAgentInterruptedRendersPersistedTranscript(t *testing.T) {
+	originalProviderFactory := newRunProvider
+	originalStoreOpener := openRunStore
+	t.Cleanup(func() {
+		newRunProvider = originalProviderFactory
+		openRunStore = originalStoreOpener
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	newRunProvider = func(_ io.Writer) (provider.Provider, error) {
+		return scriptedAppProvider{
+			respondStream: func(ctx context.Context, req provider.Request) <-chan provider.Event {
+				ch := make(chan provider.Event, 1)
+				go func() {
+					defer close(ch)
+					cancel()
+					<-ctx.Done()
+					ch <- provider.Event{Type: provider.EventTypeError, Err: ctx.Err()}
+				}()
+				_ = req
+				return ch
+			},
+		}, nil
+	}
+
+	var out bytes.Buffer
+	err := RunAgent(ctx, strings.NewReader(""), &out, "interrupt me", RunOptions{WorkingDir: t.TempDir(), DBPath: t.TempDir() + "/sessions.db"})
+	if !errors.Is(err, ErrInterrupted) {
+		t.Fatalf("expected interrupted error, got %v", err)
+	}
+	got := out.String()
+	for _, want := range []string{"session:", "user> interrupt me", "interrupted"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected interrupted output to contain %q, got %q", want, got)
+		}
+	}
+}
+
 type scriptedAppProvider struct {
-	respond func(provider.Request) []provider.Event
+	respond       func(provider.Request) []provider.Event
+	respondStream func(context.Context, provider.Request) <-chan provider.Event
 }
 
 func (s scriptedAppProvider) streamWithRequest(req provider.Request) (<-chan provider.Event, error) {
@@ -176,6 +217,9 @@ func (s scriptedAppProvider) streamWithRequest(req provider.Request) (<-chan pro
 
 func (s scriptedAppProvider) Stream(ctx context.Context, req provider.Request) (<-chan provider.Event, error) {
 	_ = ctx
+	if s.respondStream != nil {
+		return s.respondStream(ctx, req), nil
+	}
 	return s.streamWithRequest(req)
 }
 
