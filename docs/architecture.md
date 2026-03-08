@@ -18,6 +18,8 @@ These packages define the intended shape of the system. They are architectural t
   Message types, tool call/result types, conversation state, serialization.
 - `internal/provider`
   Provider interface, model config, streaming adapters, one OpenAI-compatible implementation first.
+- `internal/auth`
+  Auth readers and refresh logic for external credential sources such as Codex subscription state.
 - `internal/tools`
   Tool registry, tool contracts, and first-party developer tools such as `shell`, `write`, `edit`, and `tree`.
 - `internal/session`

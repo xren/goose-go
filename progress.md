@@ -27,8 +27,7 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 - Make the architecture executable before provider and agent code grow.
 - Use `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The SQLite backend now lives under `internal/storage/sqlite`; the next work is provider and auth foundation on top of that split.
-- The provider interface, model config, usage metadata, and first architecture check now exist; the next work is Codex auth and the first provider implementation.
-- Add a Codex auth/cache boundary that reuses `~/.codex/auth.json`.
+- The provider interface, model config, usage metadata, architecture check, and Codex auth/cache reader now exist; the next work is the first provider implementation.
 - Implement one `openai-codex` provider with assembled SSE streaming support.
 - Keep native `goose-go` login out of the first slice.
 - Keep the `goose/` submodule as reference-only material.
@@ -43,5 +42,5 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 - The repo now has a first architecture enforcement check, but the rules are still narrow and will need to expand with the runtime.
 - The runtime does not yet emit the traces or artifacts an agent will need for later debugging and eval work.
 - The first provider slice assumes file-backed Codex credentials in `~/.codex/auth.json`; keyring-backed credentials are deferred.
-- Shared Codex auth cache refresh must preserve unrelated fields and avoid corrupting the auth file.
+- Shared Codex auth cache refresh now exists, but it still depends on the current file-backed cache shape and not keyring-backed credentials.
 - Generic OpenAI API-key provider support is deferred until after the Codex-first slice is stable.

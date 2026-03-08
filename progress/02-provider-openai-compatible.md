@@ -37,7 +37,7 @@ in_progress
 - [x] Split domain-facing session contracts from SQLite implementation by moving the SQLite backend under `internal/storage/sqlite`
 - [x] Define provider interface around normalized conversation types only
 - [x] Define model config and usage metadata
-- [ ] Add a Codex auth/cache reader with token refresh support
+- [x] Add a Codex auth/cache reader with token refresh support
 - [ ] Keep Codex/OpenAI request-response DTOs inside the provider implementation
 - [ ] Implement one `openai-codex` provider
 - [ ] Support assembled assistant streaming output over SSE
@@ -63,4 +63,5 @@ in_progress
 - The SQLite backend now lives under `internal/storage/sqlite` and owns schema migration through `PRAGMA user_version`.
 - `internal/provider` now defines the normalized request, event, usage, and model config types that later provider implementations must satisfy.
 - `make check` now includes the first architecture import-boundary enforcement pass.
+- `internal/auth/codex` now owns file-backed Codex credential loading, JWT-derived metadata, token refresh, and atomic auth-file rewrite.
 - The filename still reflects older wording, but the active milestone scope is now Codex-first provider foundation.
