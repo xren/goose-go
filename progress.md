@@ -15,15 +15,15 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 | 00 | Root setup, docs, and progress structure | done | none | Repo is the system of record and workflow targets are defined | 2026-03-08 |
 | 01 | Domain model and storage | done | 00 | Structured sessions can be created, loaded, and replayed | 2026-03-08 |
 | 02 | Provider foundation and Codex-first OpenAI provider | done | 01 | Existing `codex login` user can complete streaming chat without an API key | 2026-03-08 |
-| 03 | Tool runtime and developer tools | in_progress | 01, 02 | In-process tools can be listed and executed | 2026-03-08 |
-| 04 | Agent loop and approvals | planned | 02, 03 | Multi-turn tool-using loop works with approvals | 2026-03-08 |
+| 03 | Tool runtime and developer tools | done | 01, 02 | The runtime can list and execute the initial `shell` tool | 2026-03-08 |
+| 04 | Agent loop and approvals | in_progress | 02, 03 | Multi-turn tool-using loop works with approvals | 2026-03-08 |
 | 05 | CLI and session flow | planned | 04 | Terminal session can start, interrupt, resume, and render output | 2026-03-08 |
 | 06 | Compaction, evals, and hardening | planned | 04, 05 | Eval harness catches terminal-core regressions | 2026-03-08 |
 | 99 | Later parity backlog | planned | none | Deferred work is tracked outside v1 milestones | 2026-03-08 |
 
 ## Current Focus
 
-- Start Milestone 03.
+- Start Milestone 04.
 - Make the architecture executable before provider and agent code grow.
 - Use `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The first concrete provider is now documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.
@@ -32,7 +32,9 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 - `cmd/goose-go provider-smoke` now exists as the minimal runtime proof path for the provider slice.
 - `cmd/goose-go provider-smoke --debug` now exposes the translated request, redacted headers, raw SSE events, and normalized provider events for inspection.
 - The real smoke path has been exercised successfully against local Codex auth and now documents the observed event sequence.
-- The next work is the tool runtime and first developer tools.
+- The tool contract, registry, and first in-process `shell` tool now exist.
+- The tools runtime is now documented in `internal/tools/ARCHITECTURE.md` so fresh agents can pick up the tool execution model without prior chat context.
+- The next work is the initial agent loop on top of the existing provider and `shell` tool runtime.
 - Keep native `goose-go` login out of the first slice.
 - Keep the `goose/` submodule as reference-only material.
 
@@ -49,3 +51,5 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 - Shared Codex auth cache refresh now exists, but it still depends on the current file-backed cache shape and not keyring-backed credentials.
 - The current provider implementation is intentionally narrow: SSE only, no websocket transport, and no broader Responses surface yet.
 - Generic OpenAI API-key provider support is deferred until after the Codex-first slice is stable.
+
+- Structured file tools beyond `shell` are now deferred; if the agent loop becomes too opaque or too permissive with shell-only execution, that scope cut may need to be revisited.

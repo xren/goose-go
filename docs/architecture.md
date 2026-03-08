@@ -41,11 +41,12 @@ These packages define the intended shape of the system. They are architectural t
 - `session` persists state. It should not own agent orchestration rules.
 - `cli` renders and collects terminal interaction. It should not contain core agent logic.
 
-## Concrete Provider Docs
+## Concrete Subsystem Docs
 
-The root architecture doc defines package-level boundaries. Concrete provider behavior is documented separately:
+The root architecture doc defines package-level boundaries. Concrete subsystem behavior is documented separately:
 
 - [internal/provider/openaicodex/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/provider/openaicodex/ARCHITECTURE.md): first Codex subscription provider, request translation, auth flow, and SSE normalization
+- [internal/tools/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tools/ARCHITECTURE.md): tool contract, registry, execution flow, and the first concrete `shell` tool
 
 ## Initial Runtime Scope
 

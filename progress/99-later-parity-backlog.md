@@ -18,6 +18,7 @@ none
 - keyring-backed Codex credential support
 - websocket transport for the Codex provider
 - generic OpenAI API-key provider
+- structured file tools beyond `shell` (`write`, `edit`, `tree`)
 - recipes beyond minimal support
 - remote/stdin MCP transport breadth
 - server parity
@@ -37,6 +38,7 @@ none
 - [ ] Evaluate keyring-backed Codex credential support
 - [ ] Evaluate websocket transport for the Codex provider
 - [ ] Evaluate generic OpenAI API-key provider support after the Codex-first slice is stable
+- [ ] Revisit whether `write`, `edit`, and `tree` are needed after the first agent-loop milestone
 - [ ] Revisit recipes once terminal core is stable
 - [ ] Evaluate MCP transport support after in-process tools are solid
 - [ ] Decide whether server parity is worth adding
@@ -59,3 +61,4 @@ none
 - This file is explicitly non-v1.
 - V1 intentionally reuses existing `codex login` state from `~/.codex/auth.json`.
 - Broader provider and auth surface area is intentionally deferred.
+- Structured file tools beyond `shell` are intentionally deferred until the agent loop demonstrates a need for tighter permissions or better observability.

@@ -32,6 +32,7 @@ The [goose](/Users/rex/projects/goose-go/goose) submodule is the reference imple
 - [AGENTS.md](/Users/rex/projects/goose-go/AGENTS.md): short navigation guide for agents
 - [docs/design-principles.md](/Users/rex/projects/goose-go/docs/design-principles.md): project design rules derived from the agent-first harness approach
 - [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md): target package layout and boundaries
+- [internal/tools/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tools/ARCHITECTURE.md): high-level architecture of the tool runtime and first concrete tool
 - [internal/provider/openaicodex/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/provider/openaicodex/ARCHITECTURE.md): high-level architecture of the first concrete provider
 - [docs/invariants.md](/Users/rex/projects/goose-go/docs/invariants.md): hard rules for the project
 - [docs/goose-reference.md](/Users/rex/projects/goose-go/docs/goose-reference.md): what to copy, defer, or ignore from upstream Goose
@@ -91,4 +92,4 @@ The repo now has the first runtime foundation in place:
 - a SQLite-backed session store exists with tests for create, load, append, replace, and replay
 - a real `openai-codex` provider exists with a minimal runtime smoke path
 
-The next milestone is the first provider implementation.
+The current milestone is the tool runtime, with the first `shell` tool already in place and documented next to the code.
