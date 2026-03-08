@@ -53,3 +53,6 @@ Current baseline scenarios:
 - tool call round-trip
 - approval deny path
 - interrupted run
+- resumed session
+- awaiting approval with no approver
+- max-turn termination

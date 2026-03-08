@@ -11,6 +11,7 @@ Use this file as a starting point, not the full spec.
 - [internal/session/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/session/ARCHITECTURE.md)
 - [internal/tools/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tools/ARCHITECTURE.md)
 - [internal/provider/openaicodex/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/provider/openaicodex/ARCHITECTURE.md)
+- [internal/evals/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/evals/ARCHITECTURE.md)
 - [docs/invariants.md](/Users/rex/projects/goose-go/docs/invariants.md)
 - [docs/goose-reference.md](/Users/rex/projects/goose-go/docs/goose-reference.md)
 - [docs/evals.md](/Users/rex/projects/goose-go/docs/evals.md)

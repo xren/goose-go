@@ -29,6 +29,7 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - `internal/app` and `cmd/goose-go run` now consume the live agent event stream instead of rendering only after completion.
 - `goose-go run` now writes per-session JSONL traces from the same event stream under `.goose-go/traces/`.
 - `make eval` now runs a first deterministic trace-based harness over scripted runtime scenarios.
+- `make eval` now covers plain chat, tool round-trip, approval deny, interrupt, resume, awaiting-approval, and max-turn runtime scenarios.
 - `provider-smoke` now classifies failures into normalized diagnostics and preserves low-level causes behind `--debug`.
 - `goose-go run` now classifies provider/auth failures through the same diagnostic model used by `provider-smoke`.
 - `internal/archcheck` now holds the executable boundary rules, with `cmd/archcheck` reduced to a thin entrypoint.
@@ -41,6 +42,7 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - The tools runtime is documented in `internal/tools/ARCHITECTURE.md` so fresh agents can pick up the tool execution model without prior chat context.
 - The agent runtime is documented in `internal/agent/ARCHITECTURE.md` so fresh agents can pick up the control flow without prior chat context.
 - The session boundary is documented in `internal/session/ARCHITECTURE.md` so fresh agents can see the store interface and SQLite boundary without reading implementation first.
+- The eval harness is documented in `internal/evals/ARCHITECTURE.md` so fresh agents can understand what `make eval` actually exercises without reading the test file first.
 - The root, agent, and session architecture diagrams are updated to reflect the current CLI/session surface and the Milestone 06 event-stream direction.
 - `cmd/goose-go run` now exposes the agent runtime through a minimal CLI session path.
 - The Codex provider replay path now preserves function-call item IDs separately from call IDs, which fixes multi-turn CLI runs after tool use.

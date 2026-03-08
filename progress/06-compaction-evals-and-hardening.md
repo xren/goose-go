@@ -64,6 +64,7 @@ in_progress
 - `internal/app` now renders `goose-go run` from agent events directly, which makes the event stream a real integration seam instead of test-only infrastructure.
 - `internal/app` now records the same event stream into per-session JSONL traces for postmortem debugging and future eval assertions.
 - `make eval` now runs a deterministic scripted harness under `internal/evals` that asserts on trace/event outcomes for baseline runtime scenarios.
+- The eval harness now covers resumed sessions, awaiting-approval runs, and max-turn termination in addition to the original baseline scenarios.
 - `provider-smoke` now maps low-level Codex/auth failures into a generic diagnostic model that can be reused by future providers.
 - `internal/archcheck` now holds the stronger dependency rules for auth, provider implementations, storage, evals, and CLI boundaries, with `cmd/archcheck` acting as a thin wrapper.
 - Eval quality will depend on runtime legibility, not only on test count.

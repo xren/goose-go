@@ -36,6 +36,7 @@ The [goose](/Users/rex/projects/goose-go/goose) submodule is the reference imple
 - [internal/session/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/session/ARCHITECTURE.md): session store boundary, summaries, and SQLite relationship
 - [internal/tools/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tools/ARCHITECTURE.md): high-level architecture of the tool runtime and first concrete tool
 - [internal/provider/openaicodex/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/provider/openaicodex/ARCHITECTURE.md): high-level architecture of the first concrete provider
+- [internal/evals/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/evals/ARCHITECTURE.md): deterministic runtime eval harness and trace-based regression model
 - [docs/invariants.md](/Users/rex/projects/goose-go/docs/invariants.md): hard rules for the project
 - [docs/goose-reference.md](/Users/rex/projects/goose-go/docs/goose-reference.md): what to copy, defer, or ignore from upstream Goose
 - [docs/evals.md](/Users/rex/projects/goose-go/docs/evals.md): future smoke and eval strategy

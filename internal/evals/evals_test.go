@@ -124,6 +124,72 @@ func TestEvalScenarios(t *testing.T) {
 		assertContainsTypes(t, trace, "run_started", "user_message_persisted", "turn_started", "run_interrupted")
 		assertFinalType(t, trace, "run_interrupted")
 	})
+
+	t.Run("resume_session", func(t *testing.T) {
+		workdir := t.TempDir()
+		store := openEvalStore(t)
+		record := createEvalSession(t, context.Background(), store, workdir)
+
+		runtime := newEvalRuntime(t, store, scriptedProvider{
+			respond: func(req provider.Request) []provider.Event {
+				userTexts := collectUserTexts(req.Messages)
+				last := userTexts[len(userTexts)-1]
+				reply := "reply to: " + last
+				if len(userTexts) >= 2 && userTexts[0] == "first prompt" && userTexts[1] == "second prompt" {
+					reply = "saw resume context"
+				}
+				msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text(reply))
+				return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+			},
+		}, agent.ApprovalModeAuto, nil, 4)
+
+		drainTrace(t, runtime, context.Background(), record.ID, "first prompt")
+		trace := drainTrace(t, runtime, context.Background(), record.ID, "second prompt")
+
+		assertContainsTypes(t, trace, "run_started", "user_message_persisted", "assistant_message_complete", "run_completed")
+		assertFinalType(t, trace, "run_completed")
+		if !traceContainsAssistantText(trace, "saw resume context") {
+			t.Fatalf("expected resumed trace to include assistant message %q, got %#v", "saw resume context", trace)
+		}
+	})
+
+	t.Run("awaiting_approval", func(t *testing.T) {
+		trace := runScenario(t, scenario{
+			prompt: "run pwd",
+			provider: scriptedProvider{
+				respond: func(_ provider.Request) []provider.Event {
+					msg := conversation.NewMessage(conversation.RoleAssistant, conversation.ToolRequest("call_1", "shell", []byte(`{"command":"pwd"}`)))
+					return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+				},
+			},
+			mode: agent.ApprovalModeApprove,
+		})
+
+		assertContainsTypes(t, trace, "tool_call_detected", "approval_required", "run_completed")
+		assertFinalType(t, trace, "run_completed")
+		if !finalResultHasStatus(trace, "awaiting_approval") {
+			t.Fatalf("expected final result status awaiting_approval, got %#v", trace[len(trace)-1].Result)
+		}
+	})
+
+	t.Run("max_turns", func(t *testing.T) {
+		trace := runScenario(t, scenario{
+			prompt: "loop",
+			provider: scriptedProvider{
+				respond: func(_ provider.Request) []provider.Event {
+					msg := conversation.NewMessage(conversation.RoleAssistant, conversation.ToolRequest("call_1", "shell", []byte(`{"command":"printf loop"}`)))
+					return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+				},
+			},
+			maxTurns: 1,
+		})
+
+		assertContainsTypes(t, trace, "tool_execution_started", "tool_execution_finished", "tool_message_persisted", "run_failed")
+		assertFinalType(t, trace, "run_failed")
+		if trace[len(trace)-1].Error == "" || !strings.Contains(trace[len(trace)-1].Error, "max turns exceeded") {
+			t.Fatalf("expected max-turn error in final trace, got %#v", trace[len(trace)-1])
+		}
+	})
 }
 
 type scenario struct {
@@ -131,6 +197,7 @@ type scenario struct {
 	provider provider.Provider
 	mode     agent.ApprovalMode
 	approver agent.Approver
+	maxTurns int
 }
 
 func runScenario(t *testing.T, s scenario) []traceRecord {
@@ -142,12 +209,69 @@ func runScenarioWithContext(t *testing.T, ctx context.Context, s scenario) []tra
 	t.Helper()
 
 	workdir := t.TempDir()
+	store := openEvalStore(t)
+	record := createEvalSession(t, ctx, store, workdir)
+	runtime := newEvalRuntime(t, store, s.provider, s.mode, s.approver, s.maxTurns)
+	return drainTrace(t, runtime, ctx, record.ID, s.prompt)
+}
+
+func assertContainsTypes(t *testing.T, trace []traceRecord, want ...string) {
+	t.Helper()
+	for _, expected := range want {
+		found := false
+		for _, record := range trace {
+			if record.Type == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected trace to contain %q, got %v", expected, collectTypes(trace))
+		}
+	}
+}
+
+func assertNotContainsTypes(t *testing.T, trace []traceRecord, forbidden ...string) {
+	t.Helper()
+	for _, blocked := range forbidden {
+		for _, record := range trace {
+			if record.Type == blocked {
+				t.Fatalf("expected trace to omit %q, got %v", blocked, collectTypes(trace))
+			}
+		}
+	}
+}
+
+func assertFinalType(t *testing.T, trace []traceRecord, want string) {
+	t.Helper()
+	if len(trace) == 0 {
+		t.Fatal("expected non-empty trace")
+	}
+	if got := trace[len(trace)-1].Type; got != want {
+		t.Fatalf("expected final trace type %q, got %q", want, got)
+	}
+}
+
+func collectTypes(trace []traceRecord) []string {
+	out := make([]string, 0, len(trace))
+	for _, record := range trace {
+		out = append(out, record.Type)
+	}
+	return out
+}
+
+func openEvalStore(t *testing.T) *sqlitestore.Store {
+	t.Helper()
 	store, err := sqlitestore.Open(filepath.Join(t.TempDir(), "sessions.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
+	return store
+}
 
+func createEvalSession(t *testing.T, ctx context.Context, store *sqlitestore.Store, workdir string) session.Session {
+	t.Helper()
 	record, err := store.CreateSession(ctx, session.CreateParams{
 		Name:       "eval",
 		WorkingDir: workdir,
@@ -156,28 +280,36 @@ func runScenarioWithContext(t *testing.T, ctx context.Context, s scenario) []tra
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
+	return record
+}
 
+func newEvalRuntime(t *testing.T, store *sqlitestore.Store, p provider.Provider, mode agent.ApprovalMode, approver agent.Approver, maxTurns int) *agent.Agent {
+	t.Helper()
 	registry := tools.NewRegistry()
 	if err := registry.Register(shell.New()); err != nil {
 		t.Fatalf("register shell: %v", err)
 	}
-
-	mode := s.mode
 	if mode == "" {
 		mode = agent.ApprovalModeAuto
 	}
-
-	runtime, err := agent.New(store, s.provider, registry, agent.Config{
+	if maxTurns <= 0 {
+		maxTurns = 4
+	}
+	runtime, err := agent.New(store, p, registry, agent.Config{
 		SystemPrompt: "You are helpful.",
 		Model:        provider.ModelConfig{Provider: "test", Model: "test-model"},
-		MaxTurns:     4,
+		MaxTurns:     maxTurns,
 		ApprovalMode: mode,
-	}, s.approver)
+	}, approver)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
+	return runtime
+}
 
-	stream, err := runtime.ReplyStream(ctx, record.ID, s.prompt)
+func drainTrace(t *testing.T, runtime *agent.Agent, ctx context.Context, sessionID string, prompt string) []traceRecord {
+	t.Helper()
+	stream, err := runtime.ReplyStream(ctx, sessionID, prompt)
 	if err != nil {
 		t.Fatalf("reply stream: %v", err)
 	}
@@ -253,49 +385,53 @@ func runScenarioWithContext(t *testing.T, ctx context.Context, s scenario) []tra
 	return out
 }
 
-func assertContainsTypes(t *testing.T, trace []traceRecord, want ...string) {
-	t.Helper()
-	for _, expected := range want {
-		found := false
-		for _, record := range trace {
-			if record.Type == expected {
-				found = true
-				break
+func collectUserTexts(messages []conversation.Message) []string {
+	var out []string
+	for _, message := range messages {
+		if message.Role != conversation.RoleUser {
+			continue
+		}
+		for _, content := range message.Content {
+			if content.Type == conversation.ContentTypeText && content.Text != nil {
+				out = append(out, content.Text.Text)
 			}
 		}
-		if !found {
-			t.Fatalf("expected trace to contain %q, got %v", expected, collectTypes(trace))
-		}
-	}
-}
-
-func assertNotContainsTypes(t *testing.T, trace []traceRecord, forbidden ...string) {
-	t.Helper()
-	for _, blocked := range forbidden {
-		for _, record := range trace {
-			if record.Type == blocked {
-				t.Fatalf("expected trace to omit %q, got %v", blocked, collectTypes(trace))
-			}
-		}
-	}
-}
-
-func assertFinalType(t *testing.T, trace []traceRecord, want string) {
-	t.Helper()
-	if len(trace) == 0 {
-		t.Fatal("expected non-empty trace")
-	}
-	if got := trace[len(trace)-1].Type; got != want {
-		t.Fatalf("expected final trace type %q, got %q", want, got)
-	}
-}
-
-func collectTypes(trace []traceRecord) []string {
-	out := make([]string, 0, len(trace))
-	for _, record := range trace {
-		out = append(out, record.Type)
 	}
 	return out
+}
+
+func traceContainsAssistantText(trace []traceRecord, want string) bool {
+	for _, record := range trace {
+		if record.Type != "assistant_message_complete" || record.Message == nil {
+			continue
+		}
+		content, ok := record.Message["content"].([]any)
+		if !ok {
+			continue
+		}
+		for _, item := range content {
+			block, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			textContainer, ok := block["text"].(map[string]any)
+			if !ok {
+				continue
+			}
+			if text, ok := textContainer["text"].(string); ok && text == want {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func finalResultHasStatus(trace []traceRecord, want string) bool {
+	if len(trace) == 0 || trace[len(trace)-1].Result == nil {
+		return false
+	}
+	got, _ := trace[len(trace)-1].Result["status"].(string)
+	return got == want
 }
 
 type scriptedProvider struct {
