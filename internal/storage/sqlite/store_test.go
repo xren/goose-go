@@ -156,8 +156,116 @@ func TestStoreAppliesSchemaVersion(t *testing.T) {
 		t.Fatalf("read user version: %v", err)
 	}
 
-	if version != 1 {
-		t.Fatalf("expected schema version 1, got %d", version)
+	if version != 2 {
+		t.Fatalf("expected schema version 2, got %d", version)
+	}
+}
+
+func TestStoreCompactionLifecycle(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	created, err := store.CreateSession(ctx, session.CreateParams{
+		Name:       "compaction",
+		WorkingDir: t.TempDir(),
+		Type:       session.TypeTerminal,
+	})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	first, err := store.AppendCompaction(ctx, created.ID, session.CompactionParams{
+		Summary:            "initial summary",
+		FirstKeptMessageID: "msg_1",
+		TokensBefore:       1234,
+		Trigger:            session.CompactionTriggerThreshold,
+	})
+	if err != nil {
+		t.Fatalf("append first compaction: %v", err)
+	}
+
+	second, err := store.AppendCompaction(ctx, created.ID, session.CompactionParams{
+		Summary:            "latest summary",
+		FirstKeptMessageID: "msg_2",
+		TokensBefore:       2345,
+		Trigger:            session.CompactionTriggerOverflow,
+	})
+	if err != nil {
+		t.Fatalf("append second compaction: %v", err)
+	}
+
+	if first.ID == second.ID {
+		t.Fatalf("expected unique compaction ids")
+	}
+
+	latest, err := store.GetLatestCompaction(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("get latest compaction: %v", err)
+	}
+
+	if latest.ID != second.ID {
+		t.Fatalf("expected latest compaction %q, got %q", second.ID, latest.ID)
+	}
+	if latest.Trigger != session.CompactionTriggerOverflow {
+		t.Fatalf("expected overflow trigger, got %q", latest.Trigger)
+	}
+}
+
+func TestStoreLatestCompactionNotFound(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	created, err := store.CreateSession(ctx, session.CreateParams{
+		Name:       "no-compaction",
+		WorkingDir: t.TempDir(),
+		Type:       session.TypeTerminal,
+	})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	if _, err := store.GetLatestCompaction(ctx, created.ID); err != session.ErrCompactionNotFound {
+		t.Fatalf("expected ErrCompactionNotFound, got %v", err)
+	}
+}
+
+func TestStoreCompactionPreservesConversationHistory(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	created, err := store.CreateSession(ctx, session.CreateParams{
+		Name:       "history",
+		WorkingDir: t.TempDir(),
+		Type:       session.TypeTerminal,
+	})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	original := conversation.NewMessage(conversation.RoleUser, conversation.Text("keep this"))
+	if _, err := store.AddMessage(ctx, created.ID, original); err != nil {
+		t.Fatalf("add message: %v", err)
+	}
+
+	if _, err := store.AppendCompaction(ctx, created.ID, session.CompactionParams{
+		Summary:            "summary",
+		FirstKeptMessageID: created.ID,
+		TokensBefore:       99,
+		Trigger:            session.CompactionTriggerManual,
+	}); err != nil {
+		t.Fatalf("append compaction: %v", err)
+	}
+
+	replayed, err := store.ReplayConversation(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("replay conversation: %v", err)
+	}
+
+	if got := len(replayed.Messages); got != 1 {
+		t.Fatalf("expected 1 message after compaction artifact, got %d", got)
+	}
+	if got := replayed.Messages[0].Content[0].Text.Text; got != "keep this" {
+		t.Fatalf("expected preserved conversation content, got %q", got)
 	}
 }
 

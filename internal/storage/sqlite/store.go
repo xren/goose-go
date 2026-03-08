@@ -48,6 +48,23 @@ var migrations = []migration{
 			)
 		`,
 	},
+	{
+		version: 2,
+		up: `
+			CREATE TABLE IF NOT EXISTS compactions (
+				id TEXT PRIMARY KEY,
+				session_id TEXT NOT NULL,
+				summary TEXT NOT NULL,
+				first_kept_message_id TEXT NOT NULL,
+				tokens_before INTEGER NOT NULL,
+				trigger TEXT NOT NULL,
+				created_at INTEGER NOT NULL,
+				FOREIGN KEY(session_id) REFERENCES sessions(id)
+			);
+			CREATE INDEX IF NOT EXISTS idx_compactions_session_created_at
+				ON compactions(session_id, created_at DESC);
+		`,
+	},
 }
 
 var _ session.Store = (*Store)(nil)
@@ -200,6 +217,87 @@ func (s *Store) ReplayConversation(ctx context.Context, sessionID string) (conve
 	return record.Conversation.Clone(), nil
 }
 
+func (s *Store) AppendCompaction(
+	ctx context.Context,
+	sessionID string,
+	params session.CompactionParams,
+) (session.Compaction, error) {
+	return s.withImmediateTxCompaction(ctx, func(conn *sql.Conn) (session.Compaction, error) {
+		record, err := getSession(ctx, conn, sessionID)
+		if err != nil {
+			return session.Compaction{}, err
+		}
+
+		if params.Trigger == "" {
+			params.Trigger = session.CompactionTriggerThreshold
+		}
+
+		now := time.Now().UTC().UnixNano()
+		artifact := session.Compaction{
+			ID:                 newCompactionID(),
+			SessionID:          sessionID,
+			Summary:            params.Summary,
+			FirstKeptMessageID: params.FirstKeptMessageID,
+			TokensBefore:       params.TokensBefore,
+			Trigger:            params.Trigger,
+			CreatedAt:          now,
+		}
+
+		if _, err := conn.ExecContext(
+			ctx,
+			`INSERT INTO compactions
+			 (id, session_id, summary, first_kept_message_id, tokens_before, trigger, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			artifact.ID,
+			artifact.SessionID,
+			artifact.Summary,
+			artifact.FirstKeptMessageID,
+			artifact.TokensBefore,
+			artifact.Trigger,
+			artifact.CreatedAt,
+		); err != nil {
+			return session.Compaction{}, fmt.Errorf("insert compaction: %w", err)
+		}
+
+		if err := touchSession(ctx, conn, record.ID); err != nil {
+			return session.Compaction{}, err
+		}
+
+		return artifact, nil
+	})
+}
+
+func (s *Store) GetLatestCompaction(ctx context.Context, sessionID string) (session.Compaction, error) {
+	row := s.db.QueryRowContext(
+		ctx,
+		`SELECT id, session_id, summary, first_kept_message_id, tokens_before, trigger, created_at
+		 FROM compactions
+		 WHERE session_id = ?
+		 ORDER BY created_at DESC, id DESC
+		 LIMIT 1`,
+		sessionID,
+	)
+
+	var artifact session.Compaction
+	err := row.Scan(
+		&artifact.ID,
+		&artifact.SessionID,
+		&artifact.Summary,
+		&artifact.FirstKeptMessageID,
+		&artifact.TokensBefore,
+		&artifact.Trigger,
+		&artifact.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return session.Compaction{}, session.ErrCompactionNotFound
+		}
+		return session.Compaction{}, fmt.Errorf("get latest compaction: %w", err)
+	}
+
+	return artifact, nil
+}
+
 func (s *Store) withImmediateTx(ctx context.Context, fn func(conn *sql.Conn) (session.Session, error)) (session.Session, error) {
 	conn, err := s.db.Conn(ctx)
 	if err != nil {
@@ -232,6 +330,43 @@ func (s *Store) withImmediateTx(ctx context.Context, fn func(conn *sql.Conn) (se
 
 	committed = true
 	return record, nil
+}
+
+func (s *Store) withImmediateTxCompaction(
+	ctx context.Context,
+	fn func(conn *sql.Conn) (session.Compaction, error),
+) (session.Compaction, error) {
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return session.Compaction{}, fmt.Errorf("acquire sqlite conn: %w", err)
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		return session.Compaction{}, fmt.Errorf("begin immediate tx: %w", err)
+	}
+
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		_, _ = conn.ExecContext(context.Background(), "ROLLBACK")
+	}()
+
+	artifact, err := fn(conn)
+	if err != nil {
+		return session.Compaction{}, err
+	}
+
+	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
+		return session.Compaction{}, fmt.Errorf("commit tx: %w", err)
+	}
+
+	committed = true
+	return artifact, nil
 }
 
 func getSession(ctx context.Context, queryer sessionQueryer, id string) (session.Session, error) {
@@ -306,6 +441,30 @@ func persistConversation(ctx context.Context, execer sessionExecer, record sessi
 	return record, nil
 }
 
+func touchSession(ctx context.Context, execer sessionExecer, sessionID string) error {
+	now := time.Now().UTC().Unix()
+	result, err := execer.ExecContext(
+		ctx,
+		`UPDATE sessions
+		 SET updated_at = ?
+		 WHERE id = ?`,
+		now,
+		sessionID,
+	)
+	if err != nil {
+		return fmt.Errorf("touch session: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("touch session rows affected: %w", err)
+	}
+	if rows == 0 {
+		return session.ErrSessionNotFound
+	}
+	return nil
+}
+
 func (s *Store) migrate(ctx context.Context) error {
 	currentVersion, err := s.userVersion(ctx)
 	if err != nil {
@@ -355,4 +514,8 @@ func (s *Store) userVersion(ctx context.Context) (int, error) {
 
 func newSessionID() string {
 	return "sess_" + newUUID()
+}
+
+func newCompactionID() string {
+	return "cmp_" + newUUID()
 }

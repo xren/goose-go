@@ -36,7 +36,7 @@ in_progress
 - [x] Refactor `internal/agent` to emit structured live events
 - [x] Keep blocking reply and CLI wrappers as thin adapters over the streaming runtime
 - [x] Define a stable event taxonomy for turns, assistant deltas, tool lifecycle, approvals, and termination
-- [ ] Add context compaction logic
+- [ ] Add context compaction logic (see [06a-context-compaction-plan.md](/Users/rex/projects/goose-go/progress/06a-context-compaction-plan.md))
 - [x] Add task eval runner
 - [x] Add regression cases for streaming agent flows
 - [x] Add architecture and boundary checks
@@ -69,4 +69,8 @@ in_progress
 - `internal/archcheck` now holds the stronger dependency rules for auth, provider implementations, storage, evals, and CLI boundaries, with `cmd/archcheck` acting as a thin wrapper.
 - Eval quality will depend on runtime legibility, not only on test count.
 - Runtime diagnostics must cover failures caused by shared external auth state, not only agent-loop logic.
+- Detailed compaction planning now lives in [06a-context-compaction-plan.md](/Users/rex/projects/goose-go/progress/06a-context-compaction-plan.md) and should be treated as the implementation plan for this remaining Milestone 06 item.
+- The compaction persistence/model slice is now complete: the session store exposes compaction artifacts, SQLite schema version 2 persists them in a dedicated table, and storage tests cover latest-compaction retrieval and history preservation.
+- The compaction planner slice is now complete: `internal/compaction` estimates context size, selects cut points, reconstructs active context from compaction artifacts, and serializes messages for future summarization input.
+- The compaction planner is now documented in [internal/compaction/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/compaction/ARCHITECTURE.md) so the remaining agent integration work has a package-local design reference.
 - Architecture docs should stay synchronized with the current runtime shape so fresh agents can start Milestone 06 without reconstructing the current system from code first.

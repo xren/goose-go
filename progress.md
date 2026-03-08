@@ -36,13 +36,17 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - `cmd/goose-go sessions` now exposes stored sessions from the session store abstraction.
 - `cmd/goose-go run --session <id>` now resumes an existing session and prints only the new transcript segment.
 - `cmd/goose-go run` now cancels cleanly on `SIGINT` and renders the persisted transcript instead of a raw context error.
-- The next work is expanding the event-driven runtime with richer eval coverage, stronger observability, and trace-based regression coverage.
+- Context compaction storage/model groundwork is now in place through explicit compaction artifacts in the session store and SQLite schema version 2.
+- The compaction planner groundwork is now in place in `internal/compaction`, including token estimation, cut-point selection, active-context reconstruction, and summarization-safe serialization.
+- The next compaction work is Step 3 from [progress/06a-context-compaction-plan.md](/Users/rex/projects/goose-go/progress/06a-context-compaction-plan.md): prompt template, summarizer, and provider-side usage handling.
 - Keep `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The first concrete provider is documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.
 - The tools runtime is documented in `internal/tools/ARCHITECTURE.md` so fresh agents can pick up the tool execution model without prior chat context.
 - The agent runtime is documented in `internal/agent/ARCHITECTURE.md` so fresh agents can pick up the control flow without prior chat context.
 - The session boundary is documented in `internal/session/ARCHITECTURE.md` so fresh agents can see the store interface and SQLite boundary without reading implementation first.
 - The eval harness is documented in `internal/evals/ARCHITECTURE.md` so fresh agents can understand what `make eval` actually exercises without reading the test file first.
+- The detailed compaction implementation plan now lives in [progress/06a-context-compaction-plan.md](/Users/rex/projects/goose-go/progress/06a-context-compaction-plan.md) so fresh agents can pick up the remaining Milestone 06 work without prior chat context.
+- The compaction planner is now documented in [internal/compaction/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/compaction/ARCHITECTURE.md) so fresh agents can understand the checkpoint model and cut-point logic before touching the agent loop.
 - The root, agent, and session architecture diagrams are updated to reflect the current CLI/session surface and the Milestone 06 event-stream direction.
 - `cmd/goose-go run` now exposes the agent runtime through a minimal CLI session path.
 - The Codex provider replay path now preserves function-call item IDs separately from call IDs, which fixes multi-turn CLI runs after tool use.
