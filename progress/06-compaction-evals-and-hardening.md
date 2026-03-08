@@ -72,5 +72,6 @@ in_progress
 - Detailed compaction planning now lives in [06a-context-compaction-plan.md](/Users/rex/projects/goose-go/progress/06a-context-compaction-plan.md) and should be treated as the implementation plan for this remaining Milestone 06 item.
 - The compaction persistence/model slice is now complete: the session store exposes compaction artifacts, SQLite schema version 2 persists them in a dedicated table, and storage tests cover latest-compaction retrieval and history preservation.
 - The compaction planner slice is now complete: `internal/compaction` estimates context size, selects cut points, reconstructs active context from compaction artifacts, and serializes messages for future summarization input.
+- The compaction summarizer slice is now complete: `internal/compaction` has an embedded prompt template and a provider-backed summarizer that captures summary text and usage through the normalized provider interface.
 - The compaction planner is now documented in [internal/compaction/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/compaction/ARCHITECTURE.md) so the remaining agent integration work has a package-local design reference.
 - Architecture docs should stay synchronized with the current runtime shape so fresh agents can start Milestone 06 without reconstructing the current system from code first.

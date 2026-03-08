@@ -170,13 +170,26 @@ Implementation notes:
 - Ensure provider usage is tracked for compaction runs separately from normal turns
 
 Status:
-- next
+- done
+
+Implementation notes:
+- `internal/compaction/compaction_prompt.md` now holds the first compaction summary prompt template.
+- `internal/compaction/summarizer.go` now provides a provider-backed summarizer over the existing `internal/provider` boundary.
+- The summarizer supports:
+  - serialized conversation input
+  - previous-summary updates
+  - additional focus instructions
+  - usage capture from provider events
+- `internal/compaction/summarizer_test.go` now covers request construction, previous-summary handling, provider error propagation, and empty-summary rejection.
 
 ### Step 4: Agent integration
 - Integrate threshold checks before provider submission
 - Integrate overflow recovery after provider context-length errors
 - Persist compaction artifacts and rebuild the active provider view
 - Emit compaction events on the live event stream
+
+Status:
+- next
 
 ### Step 5: CLI and trace integration
 - Ensure traces capture compaction events

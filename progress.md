@@ -38,7 +38,8 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - `cmd/goose-go run` now cancels cleanly on `SIGINT` and renders the persisted transcript instead of a raw context error.
 - Context compaction storage/model groundwork is now in place through explicit compaction artifacts in the session store and SQLite schema version 2.
 - The compaction planner groundwork is now in place in `internal/compaction`, including token estimation, cut-point selection, active-context reconstruction, and summarization-safe serialization.
-- The next compaction work is Step 3 from [progress/06a-context-compaction-plan.md](/Users/rex/projects/goose-go/progress/06a-context-compaction-plan.md): prompt template, summarizer, and provider-side usage handling.
+- The compaction summarizer groundwork is now in place in `internal/compaction`, including the first prompt template, provider-backed summary generation, previous-summary updates, and usage capture.
+- The next compaction work is Step 4 from [progress/06a-context-compaction-plan.md](/Users/rex/projects/goose-go/progress/06a-context-compaction-plan.md): wire threshold and overflow compaction into `internal/agent`, persist artifacts during runs, and emit compaction events.
 - Keep `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The first concrete provider is documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.
 - The tools runtime is documented in `internal/tools/ARCHITECTURE.md` so fresh agents can pick up the tool execution model without prior chat context.

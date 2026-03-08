@@ -1,16 +1,17 @@
 # Compaction Architecture
 
-`internal/compaction` is the runtime planning layer for context compaction.
+`internal/compaction` is the runtime planning and summarization layer for context compaction.
 
-It does not execute provider calls and it does not persist compaction artifacts directly. Its job is to answer:
+It does not persist compaction artifacts directly and it does not own agent-loop orchestration. Its job is to answer:
 
-- how large is the active conversation context
+- how large the active conversation context is
 - whether compaction should trigger
 - where the cut point should be
 - what older messages should be summarized
 - what active provider view should be reconstructed after a compaction artifact exists
+- how to ask the provider for a compaction summary through the normalized provider boundary
 
-This keeps compaction logic provider-agnostic and testable before it is wired into the agent loop.
+This keeps compaction logic explicit, testable, and separate from CLI or storage concerns.
 
 ## Package Position
 
@@ -18,6 +19,7 @@ This keeps compaction logic provider-agnostic and testable before it is wired in
 
 - `internal/conversation`
 - `internal/session`
+- `internal/provider`
 
 It must not depend on:
 
@@ -26,7 +28,7 @@ It must not depend on:
 - CLI rendering
 - app-layer orchestration
 
-The agent runtime will call into this package, then use the provider boundary to actually generate summaries, and finally persist the resulting compaction artifact through the session store.
+The agent runtime calls into this package, then persists the resulting compaction artifact through the session store.
 
 ## High-Level Flow
 
@@ -42,7 +44,7 @@ flowchart LR
     F -- "yes" --> H["FindCutPoint"]
     H --> I["MessagesToSummarize + KeptMessages"]
     I --> J["SerializeForSummarization"]
-    J --> K["provider-backed summarizer (future step)"]
+    J --> K["Summarizer.Summarize"]
     K --> L["persist compaction artifact (future step)"]
     L --> M["BuildActiveMessages"]
     M --> N["active provider view = summary + kept messages"]
@@ -63,21 +65,22 @@ The current package owns:
   - latest compaction artifact
   - kept recent messages
 - serialization of messages into a summarization-safe text format
+- provider-backed summary generation through the normalized provider interface
 
 ## What It Does Not Own
 
 This package does not:
 
-- call the provider
-- build provider HTTP payloads
 - persist compaction artifacts
 - emit agent events
 - render CLI notices
+- own the retry or threshold orchestration in the live run loop
+- build provider HTTP payloads or transport logic
 
 Those belong to:
 
 - `internal/agent`
-- `internal/provider`
+- `internal/provider` for transport details, while `internal/compaction` owns the high-level summarizer request shape
 - `internal/session` / `internal/storage/sqlite`
 - `internal/app`
 
@@ -121,6 +124,34 @@ flowchart LR
 
 This is the architectural reason compaction artifacts are explicit session records rather than invisible in-memory rewrites.
 
+### Example
+
+If a session has 500 persisted messages and compaction chooses:
+
+- summarize `m1` through `m420`
+- keep `m421` through `m500`
+
+then the next provider turn should receive:
+
+```text
+[
+  summary_message(m1..m420),
+  m421,
+  m422,
+  ...,
+  m500,
+  new_user_message
+]
+```
+
+Important:
+
+- SQLite still keeps all 500 original messages.
+- The provider does not receive all 500 messages again.
+- The provider receives the compacted active view: summary + kept suffix + newer messages.
+
+This is the intended runtime contract for compaction in `goose-go`.
+
 ## Cut-Point Rule
 
 The current implementation deliberately uses a simple rule:
@@ -149,6 +180,22 @@ This is narrower than pi-mono’s split-turn handling and is intentional for the
 
 This is done so the summarizer sees an explicit transcript to summarize rather than a live conversation to continue.
 
+## Summarizer Flow
+
+The summarizer uses:
+
+- embedded prompt template in `compaction_prompt.md`
+- serialized conversation transcript
+- optional previous summary block
+- optional additional focus instructions
+
+It calls the normalized provider interface and extracts:
+
+- final summary text
+- usage metadata from provider events
+
+This keeps the summarization call consistent with the rest of the runtime and avoids adding a provider-specific side channel just for compaction.
+
 ## Current Types
 
 - `Settings`
@@ -157,6 +204,12 @@ This is done so the summarizer sees an explicit transcript to summarize rather t
   The first kept message id and its index.
 - `Preparation`
   The planning output for a pending compaction run.
+- `SummaryRequest`
+  The summarizer input, including optional previous summary and custom instructions.
+- `SummaryResult`
+  The summarizer output, including summary text and provider usage.
+- `Summarizer`
+  Provider-backed summarizer over the normalized provider boundary.
 
 Key functions:
 
@@ -169,6 +222,8 @@ Key functions:
 - `BuildActiveMessages(...)`
 - `SummaryMessage(...)`
 - `SerializeForSummarization(...)`
+- `NewSummarizer(...)`
+- `(*Summarizer).Summarize(...)`
 
 ## Design Tradeoffs
 
@@ -177,7 +232,7 @@ Key functions:
 Current `goose-go` compaction planning does not yet support:
 
 - split-turn compaction
-- iterative summary updates
+- iterative summary updates across multiple compacted checkpoints in the runtime loop
 - branch summarization
 - extension-defined compaction
 - cumulative file-operation tracking
@@ -197,11 +252,12 @@ This package is designed around explicit compaction artifacts and reconstructed 
 
 ## Next Integration Step
 
-The next implementation step is not more planner logic. It is:
+The next implementation step is agent integration:
 
-1. add the summarization prompt and provider-backed summarizer
-2. have `internal/agent` call this planner before provider turns
-3. persist compaction artifacts through the session store
-4. emit compaction events into the existing event stream
+1. have `internal/agent` call the compaction planner before provider turns
+2. run threshold compaction before normal provider submission
+3. run overflow recovery compaction after context-limit failures
+4. persist compaction artifacts through the session store
+5. emit compaction events into the existing event stream
 
-At that point, `internal/compaction` remains the pure planning layer and `internal/agent` remains the orchestration layer.
+At that point, `internal/compaction` remains the compaction planning and summarization layer and `internal/agent` remains the orchestration layer.
