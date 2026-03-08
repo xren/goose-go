@@ -93,7 +93,7 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 		return fmt.Errorf("register shell tool: %w", err)
 	}
 
-	record, startIndex, err := loadOrCreateSession(ctx, store, prompt, workingDir, opts.SessionID)
+	record, _, err := loadOrCreateSession(ctx, store, prompt, workingDir, opts.SessionID)
 	if err != nil {
 		return err
 	}
@@ -118,27 +118,138 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 		return fmt.Errorf("create agent runtime: %w", err)
 	}
 
-	result, err := runtime.Reply(ctx, record.ID, prompt)
-	if err != nil && !errors.Is(err, agent.ErrMaxTurnsExceeded) {
-		if errors.Is(err, context.Canceled) {
-			return renderInterruptedRun(out, store, record.ID, startIndex)
-		}
-		return err
-	}
-
-	if _, werr := fmt.Fprintf(out, "session: %s\n", result.Session.ID); werr != nil {
+	if _, werr := fmt.Fprintf(out, "session: %s\n", record.ID); werr != nil {
 		return fmt.Errorf("write session header: %w", werr)
 	}
-	if rerr := renderConversationFrom(out, result.Session.Conversation, startIndex); rerr != nil {
-		return rerr
-	}
 
-	if errors.Is(err, agent.ErrMaxTurnsExceeded) {
+	stream, err := runtime.ReplyStream(ctx, record.ID, prompt)
+	if err != nil {
 		return err
 	}
-	if result.Status == agent.StatusAwaitingApproval {
-		return errors.New("agent is awaiting approval")
+
+	renderer := newEventRenderer(out)
+	var finalErr error
+	for event := range stream {
+		if err := renderer.Render(event); err != nil {
+			return err
+		}
+
+		switch event.Type {
+		case agent.EventTypeRunCompleted:
+			if event.Result != nil && event.Result.Status == agent.StatusAwaitingApproval {
+				finalErr = errors.New("agent is awaiting approval")
+			}
+		case agent.EventTypeRunInterrupted:
+			finalErr = ErrInterrupted
+		case agent.EventTypeRunFailed:
+			finalErr = event.Err
+		}
 	}
+	if err := renderer.Finish(); err != nil {
+		return err
+	}
+
+	if errors.Is(finalErr, context.Canceled) {
+		finalErr = ErrInterrupted
+	}
+	if errors.Is(finalErr, agent.ErrMaxTurnsExceeded) {
+		return finalErr
+	}
+	return finalErr
+}
+
+type eventRenderer struct {
+	out                 io.Writer
+	assistantLineOpen   bool
+	assistantDeltaShown bool
+}
+
+func newEventRenderer(out io.Writer) *eventRenderer {
+	return &eventRenderer{out: out}
+}
+
+func (r *eventRenderer) Render(event agent.Event) error {
+	switch event.Type {
+	case agent.EventTypeTurnStarted:
+		r.assistantDeltaShown = false
+	case agent.EventTypeUserMessagePersisted:
+		if event.Message != nil {
+			return renderTextBlocks(r.out, "user", event.Message.Content)
+		}
+	case agent.EventTypeProviderTextDelta:
+		if !r.assistantLineOpen {
+			if _, err := io.WriteString(r.out, "assistant> "); err != nil {
+				return fmt.Errorf("write assistant prefix: %w", err)
+			}
+			r.assistantLineOpen = true
+		}
+		if _, err := io.WriteString(r.out, event.Delta); err != nil {
+			return fmt.Errorf("write assistant delta: %w", err)
+		}
+		r.assistantDeltaShown = true
+	case agent.EventTypeAssistantMessageComplete:
+		if event.Message == nil {
+			return nil
+		}
+		if r.assistantLineOpen {
+			if _, err := io.WriteString(r.out, "\n"); err != nil {
+				return fmt.Errorf("terminate assistant line: %w", err)
+			}
+			r.assistantLineOpen = false
+		}
+		if r.assistantDeltaShown {
+			return nil
+		}
+		for _, content := range event.Message.Content {
+			if content.Type != conversation.ContentTypeText || content.Text == nil {
+				continue
+			}
+			if _, err := fmt.Fprintf(r.out, "assistant> %s\n", content.Text.Text); err != nil {
+				return fmt.Errorf("write assistant text: %w", err)
+			}
+		}
+	case agent.EventTypeToolCallDetected:
+		if r.assistantLineOpen {
+			if _, err := io.WriteString(r.out, "\n"); err != nil {
+				return fmt.Errorf("terminate assistant line: %w", err)
+			}
+			r.assistantLineOpen = false
+		}
+		if event.ToolCall != nil {
+			if _, err := fmt.Fprintf(r.out, "assistant requested tool %s %s\n", event.ToolCall.Name, compactArgs(event.ToolCall.Arguments)); err != nil {
+				return fmt.Errorf("write assistant tool request: %w", err)
+			}
+		}
+	case agent.EventTypeToolMessagePersisted:
+		if event.ToolResult != nil && event.ToolCall != nil {
+			for _, result := range event.ToolResult.Content {
+				if _, err := fmt.Fprintf(r.out, "tool[%s]> %s\n", event.ToolCall.Name, result.Text); err != nil {
+					return fmt.Errorf("write tool response: %w", err)
+				}
+			}
+		}
+	case agent.EventTypeRunInterrupted:
+		if r.assistantLineOpen {
+			if _, err := io.WriteString(r.out, "\n"); err != nil {
+				return fmt.Errorf("terminate assistant line: %w", err)
+			}
+			r.assistantLineOpen = false
+		}
+		if _, err := io.WriteString(r.out, "interrupted\n"); err != nil {
+			return fmt.Errorf("write interrupted notice: %w", err)
+		}
+	}
+	return nil
+}
+
+func (r *eventRenderer) Finish() error {
+	if !r.assistantLineOpen {
+		return nil
+	}
+	if _, err := io.WriteString(r.out, "\n"); err != nil {
+		return fmt.Errorf("terminate assistant line: %w", err)
+	}
+	r.assistantLineOpen = false
 	return nil
 }
 
@@ -180,23 +291,6 @@ func RunAgentContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 5*time.Minute)
 }
 
-func renderInterruptedRun(out io.Writer, store session.Store, sessionID string, startIndex int) error {
-	record, err := store.GetSession(context.Background(), sessionID)
-	if err != nil {
-		return ErrInterrupted
-	}
-	if _, err := fmt.Fprintf(out, "session: %s\n", record.ID); err != nil {
-		return fmt.Errorf("write interrupted session header: %w", err)
-	}
-	if err := renderConversationFrom(out, record.Conversation, startIndex); err != nil {
-		return err
-	}
-	if _, err := io.WriteString(out, "interrupted\n"); err != nil {
-		return fmt.Errorf("write interrupted notice: %w", err)
-	}
-	return ErrInterrupted
-}
-
 type interactiveApprover struct {
 	in  io.Reader
 	out io.Writer
@@ -218,61 +312,6 @@ func (a interactiveApprover) Decide(_ context.Context, req agent.ApprovalRequest
 		return agent.ApprovalDecisionAllow, nil
 	}
 	return agent.ApprovalDecisionDeny, nil
-}
-
-func renderConversationFrom(out io.Writer, conv conversation.Conversation, startIndex int) error {
-	if startIndex < 0 {
-		startIndex = 0
-	}
-	if startIndex > len(conv.Messages) {
-		startIndex = len(conv.Messages)
-	}
-	toolNames := map[string]string{}
-	for _, message := range conv.Messages {
-		for _, content := range message.Content {
-			if content.Type == conversation.ContentTypeToolRequest && content.ToolRequest != nil {
-				toolNames[content.ToolRequest.ID] = content.ToolRequest.Name
-			}
-		}
-	}
-
-	for _, message := range conv.Messages[startIndex:] {
-		switch message.Role {
-		case conversation.RoleUser:
-			if err := renderTextBlocks(out, "user", message.Content); err != nil {
-				return err
-			}
-		case conversation.RoleAssistant:
-			for _, content := range message.Content {
-				switch content.Type {
-				case conversation.ContentTypeText:
-					if _, err := fmt.Fprintf(out, "assistant> %s\n", content.Text.Text); err != nil {
-						return fmt.Errorf("write assistant text: %w", err)
-					}
-				case conversation.ContentTypeToolRequest:
-					if _, err := fmt.Fprintf(out, "assistant requested tool %s %s\n", content.ToolRequest.Name, compactArgs(content.ToolRequest.Arguments)); err != nil {
-						return fmt.Errorf("write assistant tool request: %w", err)
-					}
-				}
-			}
-		case conversation.RoleTool:
-			for _, content := range message.Content {
-				if content.Type != conversation.ContentTypeToolResponse || content.ToolResponse == nil {
-					continue
-				}
-				name := toolNames[content.ToolResponse.ID]
-				if name == "" {
-					name = "unknown"
-				}
-				for _, result := range content.ToolResponse.Content {
-					if _, err := fmt.Fprintf(out, "tool[%s]> %s\n", name, result.Text); err != nil {
-						return fmt.Errorf("write tool response: %w", err)
-					}
-				}
-			}
-		}
-	}
-	return nil
 }
 
 func renderTextBlocks(out io.Writer, prefix string, content []conversation.Content) error {

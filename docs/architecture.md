@@ -73,7 +73,7 @@ This reflects the current system shape:
 - `session.Store` is the persistence seam used by both app and agent.
 - provider, tools, auth, and storage stay behind their package boundaries.
 - `internal/agent` now owns a live event stream that both CLI and future TUI layers can consume.
-- the next architecture step is to make CLI rendering subscribe to that stream directly instead of printing only after completion.
+- `cmd/goose-go run` now renders from that stream through `internal/app`, rather than waiting for a completed transcript.
 
 ## Concrete Subsystem Docs
 

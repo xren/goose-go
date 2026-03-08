@@ -122,3 +122,4 @@ The repo now has the first runtime foundation in place:
 - an initial `internal/agent` loop exists for multi-turn replies, tool dispatch, max-turn limits, and approval handling
 
 The current milestone is now the event-stream and hardening layer; the basic CLI/session surface is in place, including interrupt handling.
+`goose-go run` now renders from the live agent event stream rather than waiting for the full transcript at the end of a run.

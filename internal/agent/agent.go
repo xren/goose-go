@@ -190,7 +190,8 @@ func (a *Agent) reply(ctx context.Context, sessionID string, userText string, em
 			if err != nil {
 				return Result{}, fmt.Errorf("append tool response: %w", err)
 			}
-			emit(Event{Type: EventTypeToolMessagePersisted, SessionID: sessionID, Turn: turn, Message: &toolMessage, ToolResult: &result})
+			callCopy := toolCall
+			emit(Event{Type: EventTypeToolMessagePersisted, SessionID: sessionID, Turn: turn, Message: &toolMessage, ToolCall: &callCopy, ToolResult: &result})
 		}
 	}
 

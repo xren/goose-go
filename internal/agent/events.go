@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 
 	"goose-go/internal/conversation"
 	"goose-go/internal/tools"
@@ -57,10 +58,10 @@ func (a *Agent) ReplyStream(ctx context.Context, sessionID string, userText stri
 			SessionID: sessionID,
 			Result:    resultOrNil(result),
 		}
-		switch err {
-		case nil:
+		switch {
+		case err == nil:
 			terminalEvent.Type = EventTypeRunCompleted
-		case context.Canceled:
+		case errors.Is(err, context.Canceled):
 			terminalEvent.Type = EventTypeRunInterrupted
 			terminalEvent.Err = err
 		default:

@@ -26,10 +26,11 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 
 - Start Milestone 06.
 - `internal/agent` now exposes a live event stream through `ReplyStream`, and `Reply` is now a wrapper over that streaming runtime.
+- `internal/app` and `cmd/goose-go run` now consume the live agent event stream instead of rendering only after completion.
 - `cmd/goose-go sessions` now exposes stored sessions from the session store abstraction.
 - `cmd/goose-go run --session <id>` now resumes an existing session and prints only the new transcript segment.
 - `cmd/goose-go run` now cancels cleanly on `SIGINT` and renders the persisted transcript instead of a raw context error.
-- The next work is refactoring `internal/agent` around a live event stream.
+- The next work is expanding the event-driven runtime with evals, observability, and stronger live-rendering coverage.
 - Keep `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The first concrete provider is documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.
 - The tools runtime is documented in `internal/tools/ARCHITECTURE.md` so fresh agents can pick up the tool execution model without prior chat context.
@@ -59,5 +60,4 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - The current provider implementation is intentionally narrow: SSE only, no websocket transport, and no broader Responses surface yet.
 - Generic OpenAI API-key provider support is deferred until after the Codex-first slice is stable.
 - Structured file tools beyond `shell` are deferred; if the agent loop becomes too opaque or too permissive with shell-only execution, that scope cut may need to be revisited.
-- If we build the TUI on top of the current blocking transcript-after-completion path, we will likely rewrite it once event streaming lands.
-- The runtime still lacks a stable event taxonomy for turns, assistant deltas, tool lifecycle, approvals, and termination.
+- If we stop short of using the event stream for real CLI and eval flows, the TUI work will still end up debugging an unproven integration seam.

@@ -61,6 +61,7 @@ in_progress
 - This milestone exists to avoid coupling future UI work to the current blocking `agent.Reply()` path.
 - Event streaming should become the source of truth for live rendering; SQLite remains the persistence layer, not the live UI transport.
 - `internal/agent` now exposes `ReplyStream`, and `Reply` consumes that stream as a compatibility wrapper.
+- `internal/app` now renders `goose-go run` from agent events directly, which makes the event stream a real integration seam instead of test-only infrastructure.
 - Eval quality will depend on runtime legibility, not only on test count.
 - Runtime diagnostics must cover failures caused by shared external auth state, not only agent-loop logic.
 - Architecture docs should stay synchronized with the current runtime shape so fresh agents can start Milestone 06 without reconstructing the current system from code first.
