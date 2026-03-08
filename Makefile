@@ -1,7 +1,8 @@
 APP := goose-go
 ARCHCHECK := archcheck
+REPOCHECK := repocheck
 
-.PHONY: run build test lint fmt tidy clean check archcheck smoke eval
+.PHONY: run build test lint fmt tidy clean check archcheck repocheck smoke eval
 
 run:
 	go run ./cmd/$(APP)
@@ -19,13 +20,16 @@ lint:
 archcheck:
 	go run ./cmd/$(ARCHCHECK)
 
+repocheck:
+	go run ./cmd/$(REPOCHECK)
+
 fmt:
 	go fmt ./...
 
 tidy:
 	go mod tidy
 
-check: fmt test lint archcheck
+check: fmt test lint archcheck repocheck
 
 smoke: run
 

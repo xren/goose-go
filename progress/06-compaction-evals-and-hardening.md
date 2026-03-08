@@ -6,7 +6,7 @@ Refactor the runtime to emit structured live events that both the CLI and a futu
 
 ## Status
 
-in_progress
+done
 
 ## Dependencies
 
@@ -42,7 +42,7 @@ in_progress
 - [x] Add architecture and boundary checks
 - [x] Add per-session structured logs and transcript artifacts for debugging
 - [x] Add provider smoke coverage and diagnostics for Codex auth/cache failures
-- [ ] Add repo hygiene checks for drift, duplication, or oversized files
+- [x] Add repo hygiene checks for drift, duplication, or oversized files
 - [x] Promote smoke and eval commands into regular workflow
 
 ## Acceptance Criteria
@@ -67,6 +67,7 @@ in_progress
 - The eval harness now covers resumed sessions, awaiting-approval runs, and max-turn termination in addition to the original baseline scenarios.
 - `provider-smoke` now maps low-level Codex/auth failures into a generic diagnostic model that can be reused by future providers.
 - `internal/archcheck` now holds the stronger dependency rules for auth, provider implementations, storage, evals, and CLI boundaries, with `cmd/archcheck` acting as a thin wrapper.
+- `internal/repocheck` now enforces repository hygiene checks over the `goose-go` tree, including oversized-file thresholds and local Markdown link validation, while intentionally ignoring the `goose/` reference submodule and generated runtime state.
 - Eval quality will depend on runtime legibility, not only on test count.
 - Runtime diagnostics must cover failures caused by shared external auth state, not only agent-loop logic.
 - Detailed compaction planning now lives in [06a-context-compaction-plan.md](/Users/rex/projects/goose-go/progress/06a-context-compaction-plan.md) and should be treated as the implementation plan for this remaining Milestone 06 item.
@@ -77,4 +78,5 @@ in_progress
 - Threshold and overflow compaction are now integrated into `internal/agent`, persisted as explicit compaction artifacts, and exposed through the live event stream and JSONL traces.
 - Compaction eval coverage now includes continuation after threshold compaction and resume after a prior compaction artifact.
 - The compaction path now counts persisted summary size during replanning, forces a real reduction when the initial cut point would be a no-op, and preserves explicit compaction disable settings.
+- `make check` now includes `repocheck`, so repository hygiene is part of the regular validation path rather than a manual follow-up.
 - Architecture docs should stay synchronized with the current runtime shape so fresh agents can start Milestone 06 without reconstructing the current system from code first.

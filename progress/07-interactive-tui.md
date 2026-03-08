@@ -32,7 +32,7 @@ planned
 
 ## Checklist
 
-- [ ] Choose the Go TUI stack and document the rationale
+- [x] Choose the Go TUI stack and document the rationale
 - [ ] Build an adapter from agent events to UI state
 - [ ] Render live assistant text and tool lifecycle events
 - [ ] Add an input box and submit flow
@@ -47,7 +47,6 @@ planned
 
 ## Open Questions
 
-- Whether the first Go TUI stack should be Bubble Tea or a lower-level renderer.
 - How much transcript history should remain live in memory versus being paged from session state.
 
 ## Notes / Findings
@@ -56,3 +55,5 @@ planned
 - The agent core must stay headless and event-driven.
 - The TUI should subscribe to runtime events and maintain its own view state.
 - Do not make the TUI read SQLite directly as its primary live data source.
+- Stage 1 should use Bubble Tea as the Go TUI stack.
+- Stage 1 should remain a minimal event-driven MVP first; richer `pi-mono`-style UX belongs in a later stage.

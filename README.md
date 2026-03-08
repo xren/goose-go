@@ -66,11 +66,13 @@ make run
 make test
 make lint
 make check
+make repocheck
 make smoke
 make eval
 ```
 
 `make eval` now runs a minimal deterministic trace-based eval suite over scripted runtime scenarios.
+`make repocheck` now runs repository hygiene checks over the `goose-go` tree, including oversized-file thresholds and local Markdown link validation.
 
 To prove the current Codex provider path end to end, run:
 
@@ -192,4 +194,4 @@ The repo now has the first runtime foundation in place:
 - context compaction is integrated into the agent loop and persisted through the session/store boundary
 - `make eval` runs a first deterministic trace-based runtime eval suite
 
-The current milestone is now the event-stream and hardening layer; the basic CLI/session surface is in place, including interrupt handling and per-session event traces.
+Milestone 06 is now complete: the event-stream and hardening layer is in place, including interrupt handling, per-session event traces, compaction, eval coverage, architecture checks, and repository hygiene checks. The next planned work is the Bubble Tea TUI milestone.
