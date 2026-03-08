@@ -13,14 +13,9 @@ import (
 	"time"
 
 	"goose-go/internal/agent"
-	"goose-go/internal/compaction"
 	"goose-go/internal/conversation"
-	"goose-go/internal/provider"
-	"goose-go/internal/provider/openaicodex"
 	"goose-go/internal/session"
-	sqlitestore "goose-go/internal/storage/sqlite"
 	"goose-go/internal/tools"
-	"goose-go/internal/tools/shell"
 )
 
 const (
@@ -46,96 +41,33 @@ type RunOptions struct {
 	SessionID     string
 }
 
-var newRunProvider = func(debugOut io.Writer) (provider.Provider, error) {
-	if debugOut != nil {
-		return openaicodex.New(openaicodex.WithDebugWriter(debugOut))
-	}
-	return openaicodex.New()
-}
-
-var openRunStore = func(path string) (storeCloser, error) {
-	return sqlitestore.Open(path)
-}
-
 func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, opts RunOptions) error {
 	if strings.TrimSpace(prompt) == "" {
 		return errors.New("prompt is required")
 	}
 
-	workingDir, err := resolveWorkingDir(opts.WorkingDir)
+	runtime, err := OpenRuntime(in, out, opts)
 	if err != nil {
 		return err
 	}
-	if opts.MaxTurns <= 0 {
-		opts.MaxTurns = 8
-	}
+	defer func() { _ = runtime.Close() }()
 
-	dbPath := opts.DBPath
-	if dbPath == "" {
-		dbPath = filepath.Join(workingDir, defaultRunDBDir, defaultRunDBName)
-	}
-
-	store, err := openRunStore(dbPath)
-	if err != nil {
-		return fmt.Errorf("open session store: %w", err)
-	}
-	defer func() { _ = store.Close() }()
-
-	var debugOut io.Writer
-	if opts.DebugProvider {
-		debugOut = out
-	}
-	p, err := newRunProvider(debugOut)
-	if err != nil {
-		return diagnoseRunError("openai-codex", fmt.Errorf("create openai-codex provider: %w", err), opts.DebugProvider)
-	}
-
-	registry := tools.NewRegistry()
-	if err := registry.Register(shell.New()); err != nil {
-		return fmt.Errorf("register shell tool: %w", err)
-	}
-
-	record, _, err := loadOrCreateSession(ctx, store, prompt, workingDir, opts.SessionID)
+	record, _, err := runtime.LoadOrCreateSession(ctx, prompt, opts.SessionID)
 	if err != nil {
 		return err
 	}
 
-	traceDir := opts.TraceDir
-	if traceDir == "" {
-		traceDir = filepath.Join(filepath.Dir(dbPath), "traces")
-	}
-	traceWriter, err := openTraceWriter(traceDir, record.ID)
+	traceWriter, err := runtime.OpenTraceWriter(record.ID)
 	if err != nil {
 		return fmt.Errorf("open trace writer: %w", err)
 	}
 	defer func() { _ = traceWriter.Close() }()
 
-	approvalMode := agent.ApprovalModeAuto
-	var approver agent.Approver
-	if opts.Approve {
-		approvalMode = agent.ApprovalModeApprove
-		approver = interactiveApprover{in: in, out: out}
-	}
-
-	runtime, err := agent.New(store, p, registry, agent.Config{
-		SystemPrompt: defaultRunSystemPrompt,
-		Model: provider.ModelConfig{
-			Provider: "openai-codex",
-			Model:    "gpt-5-codex",
-		},
-		Compaction:   compaction.DefaultSettings(),
-		MaxTurns:     opts.MaxTurns,
-		ApprovalMode: approvalMode,
-	}, approver)
-	if err != nil {
-		return fmt.Errorf("create agent runtime: %w", err)
-	}
-
 	if _, werr := fmt.Fprintf(out, "session: %s\n", record.ID); werr != nil {
 		return fmt.Errorf("write session header: %w", werr)
 	}
 
-	stream, err := runtime.ReplyStream(ctx, record.ID, prompt)
+	stream, err := runtime.Agent().ReplyStream(ctx, record.ID, prompt)
 	if err != nil {
 		return diagnoseRunError("openai-codex", err, opts.DebugProvider)
 	}
@@ -182,6 +114,11 @@ type traceWriter struct {
 	enc  *json.Encoder
 }
 
+type EventRecorder interface {
+	Write(agent.Event) error
+	Close() error
+}
+
 type traceRecord struct {
 	RecordedAt       time.Time                 `json:"recorded_at"`
 	Type             agent.EventType           `json:"type"`
@@ -200,7 +137,7 @@ type traceRecord struct {
 	Error            string                    `json:"error,omitempty"`
 }
 
-func openTraceWriter(traceDir string, sessionID string) (*traceWriter, error) {
+func openTraceWriter(traceDir string, sessionID string) (EventRecorder, error) {
 	if err := os.MkdirAll(traceDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create trace directory: %w", err)
 	}
@@ -367,11 +304,7 @@ func ListSessions(ctx context.Context, out io.Writer, opts RunOptions) error {
 		return err
 	}
 
-	dbPath := opts.DBPath
-	if dbPath == "" {
-		dbPath = filepath.Join(workingDir, defaultRunDBDir, defaultRunDBName)
-	}
-
+	dbPath := resolveDBPath(workingDir, opts.DBPath)
 	store, err := openRunStore(dbPath)
 	if err != nil {
 		return fmt.Errorf("open session store: %w", err)

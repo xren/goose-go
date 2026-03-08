@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"goose-go/internal/app"
+	"goose-go/internal/tui"
 )
 
 func main() {
@@ -70,6 +71,23 @@ func run(args []string) error {
 
 		return app.RunProviderSmoke(ctx, os.Stdout, prompt, app.ProviderSmokeOptions{
 			Debug: *debug,
+		})
+	case "tui":
+		fs := flag.NewFlagSet("tui", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		sessionID := fs.String("session", "", "resume an existing session by id")
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		ctx, cancel := app.RunAgentContext()
+		defer cancel()
+		runtime, err := app.OpenRuntime(os.Stdin, os.Stdout, app.RunOptions{})
+		if err != nil {
+			return err
+		}
+		defer func() { _ = runtime.Close() }()
+		return tui.Run(ctx, os.Stdin, os.Stdout, runtime, tui.Options{
+			SessionID: *sessionID,
 		})
 	default:
 		return fmt.Errorf("unknown command %q", args[0])

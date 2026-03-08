@@ -19,13 +19,18 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 | 04 | Agent loop and approvals | done | 02, 03 | Multi-turn tool-using loop works with approvals | 2026-03-08 |
 | 05 | CLI and session flow | done | 04 | Terminal session can start, inspect, resume, and interrupt cleanly | 2026-03-08 |
 | 06 | Agent event stream, evals, and hardening | done | 04, 05 | Runtime emits structured events and eval harness catches regressions | 2026-03-08 |
-| 07 | Interactive TUI | planned | 05, 06 | TUI can drive sessions through event stream without owning runtime logic | 2026-03-08 |
+| 07 | Interactive TUI | in_progress | 05, 06 | TUI can drive sessions through event stream without owning runtime logic | 2026-03-08 |
 | 99 | Later parity backlog | planned | none | Deferred work is tracked outside v1 milestones | 2026-03-08 |
 
 ## Current Focus
 
 - Milestone 06 is complete.
-- Next planned work is Milestone 07: a minimal Bubble Tea TUI that consumes the existing agent event stream.
+- Milestone 07 is now in progress with the first Bubble Tea TUI scaffold under `internal/tui` and `cmd/goose-go tui`.
+- Milestone 07 is now split into a rollup plus supporting plan files:
+  - [progress/07a-tui-stage1-mvp.md](/Users/rex/projects/goose-go/progress/07a-tui-stage1-mvp.md)
+  - [progress/07b-tui-stage2-ux.md](/Users/rex/projects/goose-go/progress/07b-tui-stage2-ux.md)
+  - [progress/07c-tui-architecture.md](/Users/rex/projects/goose-go/progress/07c-tui-architecture.md)
+- The TUI planning files are now populated with the execution plan; implementation should start from `07c` and `07a`, not from the rollup alone.
 - `internal/agent` now exposes a live event stream through `ReplyStream`, and `Reply` is now a wrapper over that streaming runtime.
 - `internal/app` and `cmd/goose-go run` now consume the live agent event stream instead of rendering only after completion.
 - `goose-go run` now writes per-session JSONL traces from the same event stream under `.goose-go/traces/`.
@@ -46,6 +51,8 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - The agent compaction path now also handles prior-summary token accounting, forced reduction when the initial cut point would be a no-op, and explicit `Compaction.Enabled=false` configs.
 - `internal/repocheck` now closes out the remaining Milestone 06 hardening work with oversized-file checks and local Markdown link validation.
 - Stage 1 TUI work should use Bubble Tea.
+- The initial TUI scaffold now reuses the same runtime/session path as `goose-go run`, and consumes `ReplyStream(...)` directly rather than inventing a separate runtime path.
+- The remaining Stage 1 TUI work is focused on stronger smoke coverage, a manual runbook, and UI stabilization before Stage 2 UX expansion.
 - Keep `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The first concrete provider is documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.
 - The tools runtime is documented in `internal/tools/ARCHITECTURE.md` so fresh agents can pick up the tool execution model without prior chat context.

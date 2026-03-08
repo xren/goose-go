@@ -6,7 +6,7 @@ Build a minimal interactive TUI on top of the event-driven runtime, borrowing th
 
 ## Status
 
-planned
+in_progress
 
 ## Dependencies
 
@@ -15,13 +15,8 @@ planned
 
 ## Scope In
 
-- TUI view model that consumes agent events
-- live transcript rendering
-- input editor / composer
-- status and footer rendering
-- approval prompts
-- session picker or resume entrypoint
-- tool execution rendering
+- Stage 1 MVP over the event-driven runtime
+- Stage 2 richer coding UX after the MVP is stable
 
 ## Scope Out
 
@@ -33,12 +28,16 @@ planned
 ## Checklist
 
 - [x] Choose the Go TUI stack and document the rationale
-- [ ] Build an adapter from agent events to UI state
-- [ ] Render live assistant text and tool lifecycle events
-- [ ] Add an input box and submit flow
-- [ ] Surface approval-required state as first-class UI
-- [ ] Add session picker or resume UI
-- [ ] Add TUI smoke tests
+- [x] Finalize the TUI architecture plan
+- [x] Complete Stage 1 MVP plan
+- [x] Complete Stage 2 richer UX plan
+- [ ] Implement Stage 1 MVP
+- [ ] Implement Stage 2 richer UX
+
+Current note:
+
+- the initial Stage 1 scaffold is now in the repo under `internal/tui` and `cmd/goose-go tui`
+- the remaining Stage 1 work is focused on stronger smoke coverage, a manual runbook, and UI stabilization
 
 ## Acceptance Criteria
 
@@ -57,3 +56,8 @@ planned
 - Do not make the TUI read SQLite directly as its primary live data source.
 - Stage 1 should use Bubble Tea as the Go TUI stack.
 - Stage 1 should remain a minimal event-driven MVP first; richer `pi-mono`-style UX belongs in a later stage.
+- Supporting plans now live in:
+  - the detailed plans are now populated and should be treated as the system of record for implementation
+  - [07a-tui-stage1-mvp.md](/Users/rex/projects/goose-go/progress/07a-tui-stage1-mvp.md)
+  - [07b-tui-stage2-ux.md](/Users/rex/projects/goose-go/progress/07b-tui-stage2-ux.md)
+  - [07c-tui-architecture.md](/Users/rex/projects/goose-go/progress/07c-tui-architecture.md)

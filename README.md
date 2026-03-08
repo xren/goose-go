@@ -38,6 +38,7 @@ The [goose](/Users/rex/projects/goose-go/goose) submodule is the reference imple
 - [internal/compaction/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/compaction/ARCHITECTURE.md): compaction planning layer, cut-point logic, and active-context reconstruction
 - [internal/provider/openaicodex/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/provider/openaicodex/ARCHITECTURE.md): high-level architecture of the first concrete provider
 - [internal/evals/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/evals/ARCHITECTURE.md): deterministic runtime eval harness and trace-based regression model
+- [internal/tui/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/ARCHITECTURE.md): Bubble Tea frontend architecture over the live agent event stream
 - [docs/invariants.md](/Users/rex/projects/goose-go/docs/invariants.md): hard rules for the project
 - [docs/goose-reference.md](/Users/rex/projects/goose-go/docs/goose-reference.md): what to copy, defer, or ignore from upstream Goose
 - [docs/evals.md](/Users/rex/projects/goose-go/docs/evals.md): future smoke and eval strategy
@@ -126,8 +127,16 @@ To resume an existing session:
 go run ./cmd/goose-go run --session <session-id> "continue from here"
 ```
 
+To open the Stage 1 TUI:
+
+```sh
+go run ./cmd/goose-go tui
+go run ./cmd/goose-go tui --session <session-id>
+```
+
 Press `Ctrl-C` during `goose-go run` to cancel the active run cleanly. The current persisted session state is kept and the CLI renders the transcript captured so far.
 Each `goose-go run` also writes a per-session JSONL trace under `.goose-go/traces/` by default.
+The TUI uses the same runtime/session path and renders from the same live event stream.
 
 ## How A Run Works
 
@@ -194,4 +203,4 @@ The repo now has the first runtime foundation in place:
 - context compaction is integrated into the agent loop and persisted through the session/store boundary
 - `make eval` runs a first deterministic trace-based runtime eval suite
 
-Milestone 06 is now complete: the event-stream and hardening layer is in place, including interrupt handling, per-session event traces, compaction, eval coverage, architecture checks, and repository hygiene checks. The next planned work is the Bubble Tea TUI milestone.
+Milestone 06 is now complete: the event-stream and hardening layer is in place, including interrupt handling, per-session event traces, compaction, eval coverage, architecture checks, and repository hygiene checks. Milestone 07 is now in progress with the initial Bubble Tea TUI scaffold under `internal/tui` and `cmd/goose-go tui`.

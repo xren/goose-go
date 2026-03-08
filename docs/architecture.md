@@ -32,6 +32,8 @@ These packages define the intended shape of the system. They are architectural t
   Config loading, secrets, run modes, permission settings.
 - `internal/evals`
   Smoke tests, task evals, regression harness.
+- `internal/tui`
+  Bubble Tea frontend, event adapter, transcript state, and interactive terminal rendering.
 
 ## Layer Boundaries
 
@@ -57,6 +59,8 @@ flowchart LR
     A["cmd/goose-go"] --> B["internal/app"]
     B --> C["internal/agent"]
     B --> D["session.Store"]
+    A --> T["internal/tui"]
+    T --> B
 
     C --> E["internal/provider"]
     C --> F["internal/tools"]
@@ -71,8 +75,8 @@ flowchart LR
     D --> L["internal/storage/sqlite"]
     L --> M[(".goose-go/sessions.db")]
 
-    C -. "Milestone 06" .-> N["agent event stream"]
-    N -. "Milestone 07" .-> O["interactive TUI"]
+    C --> N["agent event stream"]
+    N --> O["interactive TUI"]
 ```
 
 This reflects the current system shape:
@@ -83,8 +87,30 @@ This reflects the current system shape:
 - provider, tools, auth, and storage stay behind their package boundaries.
 - `internal/agent` now owns a live event stream that both CLI and future TUI layers can consume.
 - `cmd/goose-go run` now renders from that stream through `internal/app`, rather than waiting for a completed transcript.
+- `cmd/goose-go tui` now uses the same `internal/app.OpenRuntime` path and consumes `ReplyStream(...)` through `internal/tui`.
 - `internal/app` now also records that stream into per-session trace artifacts for later debugging and eval work.
 - `internal/app` now also owns the normalized user-facing diagnostic model for provider/auth failures across both `run` and `provider-smoke`.
+
+## Current Entry Surfaces
+
+```mermaid
+flowchart TD
+    A["cmd/goose-go run"] --> B["internal/app.RunAgent"]
+    C["cmd/goose-go sessions"] --> D["internal/app.ListSessions"]
+    E["cmd/goose-go tui"] --> F["internal/app.OpenRuntime"]
+    F --> G["internal/tui.Run"]
+
+    B --> H["agent event stream"]
+    G --> H
+    H --> I["terminal renderer"]
+    H --> J["Bubble Tea reducer"]
+```
+
+This is the current concrete shape:
+
+- `run` is the line-oriented CLI over the event stream
+- `tui` is the Bubble Tea frontend over the same runtime and event stream
+- both paths reuse the same provider, tool, session, trace, and compaction behavior
 
 ## Concrete Subsystem Docs
 
@@ -96,6 +122,7 @@ The root architecture doc defines package-level boundaries. Concrete subsystem b
 - [internal/session/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/session/ARCHITECTURE.md): session store contract, summaries, and SQLite boundary
 - [internal/tools/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tools/ARCHITECTURE.md): tool contract, registry, execution flow, and the first concrete `shell` tool
 - [internal/evals/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/evals/ARCHITECTURE.md): deterministic eval harness over real runtime boundaries and trace assertions
+- [internal/tui/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/ARCHITECTURE.md): Bubble Tea frontend, runtime bridge, and transcript state model over the live agent event stream
 
 ## Initial Runtime Scope
 
