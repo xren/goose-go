@@ -37,13 +37,13 @@ in_progress
 - [x] Keep blocking reply and CLI wrappers as thin adapters over the streaming runtime
 - [x] Define a stable event taxonomy for turns, assistant deltas, tool lifecycle, approvals, and termination
 - [ ] Add context compaction logic
-- [ ] Add task eval runner
-- [ ] Add regression cases for streaming agent flows
+- [x] Add task eval runner
+- [x] Add regression cases for streaming agent flows
 - [ ] Add architecture and boundary checks
-- [ ] Add per-session structured logs and transcript artifacts for debugging
+- [x] Add per-session structured logs and transcript artifacts for debugging
 - [ ] Add provider smoke coverage and diagnostics for Codex auth/cache failures
 - [ ] Add repo hygiene checks for drift, duplication, or oversized files
-- [ ] Promote smoke and eval commands into regular workflow
+- [x] Promote smoke and eval commands into regular workflow
 
 ## Acceptance Criteria
 
@@ -62,6 +62,8 @@ in_progress
 - Event streaming should become the source of truth for live rendering; SQLite remains the persistence layer, not the live UI transport.
 - `internal/agent` now exposes `ReplyStream`, and `Reply` consumes that stream as a compatibility wrapper.
 - `internal/app` now renders `goose-go run` from agent events directly, which makes the event stream a real integration seam instead of test-only infrastructure.
+- `internal/app` now records the same event stream into per-session JSONL traces for postmortem debugging and future eval assertions.
+- `make eval` now runs a deterministic scripted harness under `internal/evals` that asserts on trace/event outcomes for baseline runtime scenarios.
 - Eval quality will depend on runtime legibility, not only on test count.
 - Runtime diagnostics must cover failures caused by shared external auth state, not only agent-loop logic.
 - Architecture docs should stay synchronized with the current runtime shape so fresh agents can start Milestone 06 without reconstructing the current system from code first.

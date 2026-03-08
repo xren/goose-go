@@ -74,6 +74,7 @@ This reflects the current system shape:
 - provider, tools, auth, and storage stay behind their package boundaries.
 - `internal/agent` now owns a live event stream that both CLI and future TUI layers can consume.
 - `cmd/goose-go run` now renders from that stream through `internal/app`, rather than waiting for a completed transcript.
+- `internal/app` now also records that stream into per-session trace artifacts for later debugging and eval work.
 
 ## Concrete Subsystem Docs
 

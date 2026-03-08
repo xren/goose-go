@@ -181,6 +181,7 @@ The next architecture step is Milestone 06:
 
 - keep growing the event stream into the primary live runtime interface
 - keep CLI rendering on top of the event stream instead of transcript-after-completion output
+- feed trace/log sinks from the same event stream so runs stay debuggable after the terminal output is gone
 - make live rendering and future TUI work subscribe to agent events instead of polling persistence
 
 `internal/agent` should remain the only runtime orchestration layer even after event streaming lands.

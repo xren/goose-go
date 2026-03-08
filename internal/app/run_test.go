@@ -3,8 +3,11 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -201,6 +204,68 @@ func TestRunAgentInterruptedRendersPersistedTranscript(t *testing.T) {
 	}
 }
 
+func TestRunAgentWritesTraceFile(t *testing.T) {
+	originalProviderFactory := newRunProvider
+	originalStoreOpener := openRunStore
+	t.Cleanup(func() {
+		newRunProvider = originalProviderFactory
+		openRunStore = originalStoreOpener
+	})
+
+	newRunProvider = func(_ io.Writer) (provider.Provider, error) {
+		return scriptedAppProvider{
+			respond: func(_ provider.Request) []provider.Event {
+				msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("pong"))
+				return []provider.Event{
+					{Type: provider.EventTypeTextDelta, Delta: "pong"},
+					{Type: provider.EventTypeMessageComplete, Message: &msg},
+					{Type: provider.EventTypeDone},
+				}
+			},
+		}, nil
+	}
+
+	var out bytes.Buffer
+	traceDir := t.TempDir()
+	dbPath := filepath.Join(t.TempDir(), "sessions.db")
+	if err := RunAgent(context.Background(), strings.NewReader(""), &out, "ping", RunOptions{
+		WorkingDir: t.TempDir(),
+		DBPath:     dbPath,
+		TraceDir:   traceDir,
+	}); err != nil {
+		t.Fatalf("run agent: %v", err)
+	}
+
+	sessionID := strings.Split(strings.SplitN(out.String(), "\n", 2)[0], ": ")[1]
+	tracePath := filepath.Join(traceDir, sessionID+".jsonl")
+	data, err := os.ReadFile(tracePath)
+	if err != nil {
+		t.Fatalf("read trace file: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) == 0 {
+		t.Fatal("expected trace lines")
+	}
+
+	var foundTypes []string
+	for _, line := range lines {
+		var record map[string]any
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			t.Fatalf("decode trace line: %v", err)
+		}
+		if _, ok := record["recorded_at"]; !ok {
+			t.Fatalf("expected recorded_at in trace line: %s", line)
+		}
+		foundTypes = append(foundTypes, record["type"].(string))
+	}
+
+	for _, want := range []string{"run_started", "user_message_persisted", "turn_started", "provider_text_delta", "assistant_message_complete", "assistant_message_persisted", "run_completed"} {
+		if !contains(foundTypes, want) {
+			t.Fatalf("expected trace types to contain %q, got %v", want, foundTypes)
+		}
+	}
+}
+
 type scriptedAppProvider struct {
 	respond       func(provider.Request) []provider.Event
 	respondStream func(context.Context, provider.Request) <-chan provider.Event
@@ -229,6 +294,15 @@ func hasToolResponse(messages []conversation.Message) bool {
 			if content.Type == conversation.ContentTypeToolResponse {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func contains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
 		}
 	}
 	return false

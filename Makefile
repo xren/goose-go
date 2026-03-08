@@ -30,8 +30,7 @@ check: fmt test lint archcheck
 smoke: run
 
 eval:
-	@echo "eval harness not implemented yet"
-	@exit 1
+	go test ./internal/evals -v
 
 clean:
 	rm -rf bin coverage.out

@@ -27,10 +27,12 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - Start Milestone 06.
 - `internal/agent` now exposes a live event stream through `ReplyStream`, and `Reply` is now a wrapper over that streaming runtime.
 - `internal/app` and `cmd/goose-go run` now consume the live agent event stream instead of rendering only after completion.
+- `goose-go run` now writes per-session JSONL traces from the same event stream under `.goose-go/traces/`.
+- `make eval` now runs a first deterministic trace-based harness over scripted runtime scenarios.
 - `cmd/goose-go sessions` now exposes stored sessions from the session store abstraction.
 - `cmd/goose-go run --session <id>` now resumes an existing session and prints only the new transcript segment.
 - `cmd/goose-go run` now cancels cleanly on `SIGINT` and renders the persisted transcript instead of a raw context error.
-- The next work is expanding the event-driven runtime with evals, observability, and stronger live-rendering coverage.
+- The next work is expanding the event-driven runtime with richer eval coverage, stronger observability, and trace-based regression coverage.
 - Keep `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The first concrete provider is documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.
 - The tools runtime is documented in `internal/tools/ARCHITECTURE.md` so fresh agents can pick up the tool execution model without prior chat context.
@@ -51,7 +53,6 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - The module path is still local (`goose-go`) and will need a real import path later.
 - Upstream Goose has broader product surface area than this repo should target in v1.
 - If root docs drift from implementation, agents will start making incorrect assumptions.
-- `make eval` is intentionally a stub in Milestone 00 and does not represent a working harness yet.
 - The first persistence backend is SQLite with JSON-encoded conversations; if that shape changes later, migration work will be needed.
 - The repo now has a first architecture enforcement check, but the rules are still narrow and will need to expand with the runtime.
 - The runtime does not yet emit the traces or artifacts an agent will need for later debugging and eval work.
@@ -61,3 +62,4 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - Generic OpenAI API-key provider support is deferred until after the Codex-first slice is stable.
 - Structured file tools beyond `shell` are deferred; if the agent loop becomes too opaque or too permissive with shell-only execution, that scope cut may need to be revisited.
 - If we stop short of using the event stream for real CLI and eval flows, the TUI work will still end up debugging an unproven integration seam.
+- The current eval harness is intentionally narrow and scripted; it still needs broader scenario coverage and CLI-facing smoke integration.

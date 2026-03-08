@@ -21,6 +21,7 @@ The first smoke path should confirm:
 - a session can be created
 - a simple prompt can flow through the runtime
 - developer tools can be exercised once they exist
+- a per-session event trace is written for later inspection
 
 ## Initial Task Eval Categories
 
@@ -34,5 +35,21 @@ The first smoke path should confirm:
 ## Repo Workflow
 
 - `make smoke` should remain the minimal human-readable check.
-- `make eval` is the stable entrypoint for the future harness, even if Milestone 00 only provides a stub.
+- `make eval` should run deterministic scripted scenarios against the real runtime boundaries.
 - New runtime behavior should be tied to a unit, integration, smoke, or eval case before the milestone is marked done.
+- Event traces should be preferred over terminal output when evals need to assert ordering or runtime state transitions.
+
+## Current Eval Harness
+
+The first eval harness is intentionally narrow:
+
+- it is deterministic and does not call live providers
+- it drives `internal/agent` through scripted provider scenarios
+- it records normalized trace events and asserts on event ordering and terminal run status
+
+Current baseline scenarios:
+
+- plain chat completion
+- tool call round-trip
+- approval deny path
+- interrupted run

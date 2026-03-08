@@ -68,7 +68,7 @@ make smoke
 make eval
 ```
 
-`make eval` is a stable command shape for the future harness. In Milestone 00 it is intentionally a stub.
+`make eval` now runs a minimal deterministic trace-based eval suite over scripted runtime scenarios.
 
 To prove the current Codex provider path end to end, run:
 
@@ -109,6 +109,7 @@ go run ./cmd/goose-go run --session <session-id> "continue from here"
 ```
 
 Press `Ctrl-C` during `goose-go run` to cancel the active run cleanly. The current persisted session state is kept and the CLI renders the transcript captured so far.
+Each `goose-go run` also writes a per-session JSONL trace under `.goose-go/traces/` by default.
 
 ## Current State
 
@@ -121,5 +122,5 @@ The repo now has the first runtime foundation in place:
 - a real `openai-codex` provider exists with a minimal runtime smoke path
 - an initial `internal/agent` loop exists for multi-turn replies, tool dispatch, max-turn limits, and approval handling
 
-The current milestone is now the event-stream and hardening layer; the basic CLI/session surface is in place, including interrupt handling.
+The current milestone is now the event-stream and hardening layer; the basic CLI/session surface is in place, including interrupt handling and per-session event traces.
 `goose-go run` now renders from the live agent event stream rather than waiting for the full transcript at the end of a run.

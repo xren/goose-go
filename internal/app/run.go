@@ -40,6 +40,7 @@ type RunOptions struct {
 	DebugProvider bool
 	WorkingDir    string
 	DBPath        string
+	TraceDir      string
 	MaxTurns      int
 	SessionID     string
 }
@@ -98,6 +99,16 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 		return err
 	}
 
+	traceDir := opts.TraceDir
+	if traceDir == "" {
+		traceDir = filepath.Join(filepath.Dir(dbPath), "traces")
+	}
+	traceWriter, err := openTraceWriter(traceDir, record.ID)
+	if err != nil {
+		return fmt.Errorf("open trace writer: %w", err)
+	}
+	defer func() { _ = traceWriter.Close() }()
+
 	approvalMode := agent.ApprovalModeAuto
 	var approver agent.Approver
 	if opts.Approve {
@@ -130,6 +141,9 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 	renderer := newEventRenderer(out)
 	var finalErr error
 	for event := range stream {
+		if err := traceWriter.Write(event); err != nil {
+			return fmt.Errorf("write trace event: %w", err)
+		}
 		if err := renderer.Render(event); err != nil {
 			return err
 		}
@@ -156,6 +170,71 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 		return finalErr
 	}
 	return finalErr
+}
+
+type traceWriter struct {
+	file *os.File
+	enc  *json.Encoder
+}
+
+type traceRecord struct {
+	RecordedAt time.Time              `json:"recorded_at"`
+	Type       agent.EventType        `json:"type"`
+	SessionID  string                 `json:"session_id,omitempty"`
+	Turn       int                    `json:"turn,omitempty"`
+	Delta      string                 `json:"delta,omitempty"`
+	Message    *conversation.Message  `json:"message,omitempty"`
+	ToolCall   *tools.Call            `json:"tool_call,omitempty"`
+	ToolResult *tools.Result          `json:"tool_result,omitempty"`
+	Approval   *agent.ApprovalRequest `json:"approval_request,omitempty"`
+	Decision   agent.ApprovalDecision `json:"approval_decision,omitempty"`
+	Result     *agent.Result          `json:"result,omitempty"`
+	Error      string                 `json:"error,omitempty"`
+}
+
+func openTraceWriter(traceDir string, sessionID string) (*traceWriter, error) {
+	if err := os.MkdirAll(traceDir, 0o755); err != nil {
+		return nil, fmt.Errorf("create trace directory: %w", err)
+	}
+	path := filepath.Join(traceDir, sessionID+".jsonl")
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return nil, fmt.Errorf("open trace file: %w", err)
+	}
+	return &traceWriter{
+		file: file,
+		enc:  json.NewEncoder(file),
+	}, nil
+}
+
+func (w *traceWriter) Write(event agent.Event) error {
+	record := traceRecord{
+		RecordedAt: time.Now().UTC(),
+		Type:       event.Type,
+		SessionID:  event.SessionID,
+		Turn:       event.Turn,
+		Delta:      event.Delta,
+		Message:    event.Message,
+		ToolCall:   event.ToolCall,
+		ToolResult: event.ToolResult,
+		Approval:   event.ApprovalRequest,
+		Decision:   event.ApprovalDecision,
+		Result:     event.Result,
+	}
+	if event.Err != nil {
+		record.Error = event.Err.Error()
+	}
+	if err := w.enc.Encode(record); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (w *traceWriter) Close() error {
+	if w == nil || w.file == nil {
+		return nil
+	}
+	return w.file.Close()
 }
 
 type eventRenderer struct {
