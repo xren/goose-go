@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/google/uuid"
-
 	"goose-go/internal/conversation"
 )
 
@@ -42,7 +40,3 @@ type Store interface {
 }
 
 var ErrSessionNotFound = errors.New("session not found")
-
-func newSessionID() string {
-	return "sess_" + uuid.NewString()
-}

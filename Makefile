@@ -1,6 +1,7 @@
 APP := goose-go
+ARCHCHECK := archcheck
 
-.PHONY: run build test lint fmt tidy clean check smoke eval
+.PHONY: run build test lint fmt tidy clean check archcheck smoke eval
 
 run:
 	go run ./cmd/$(APP)
@@ -15,13 +16,16 @@ test:
 lint:
 	golangci-lint run
 
+archcheck:
+	go run ./cmd/$(ARCHCHECK)
+
 fmt:
 	go fmt ./...
 
 tidy:
 	go mod tidy
 
-check: fmt test lint
+check: fmt test lint archcheck
 
 smoke: run
 

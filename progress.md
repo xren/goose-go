@@ -27,7 +27,7 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 - Make the architecture executable before provider and agent code grow.
 - Use `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The SQLite backend now lives under `internal/storage/sqlite`; the next work is provider and auth foundation on top of that split.
-- Define the provider interface around normalized conversation types only.
+- The provider interface, model config, usage metadata, and first architecture check now exist; the next work is Codex auth and the first provider implementation.
 - Add a Codex auth/cache boundary that reuses `~/.codex/auth.json`.
 - Implement one `openai-codex` provider with assembled SSE streaming support.
 - Keep native `goose-go` login out of the first slice.
@@ -40,7 +40,7 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 - If root docs drift from implementation, agents will start making incorrect assumptions.
 - `make eval` is intentionally a stub in Milestone 00 and does not represent a working harness yet.
 - The first persistence backend is SQLite with JSON-encoded conversations; if that shape changes later, migration work will be needed.
-- The current architecture is documented but not mechanically enforced yet.
+- The repo now has a first architecture enforcement check, but the rules are still narrow and will need to expand with the runtime.
 - The runtime does not yet emit the traces or artifacts an agent will need for later debugging and eval work.
 - The first provider slice assumes file-backed Codex credentials in `~/.codex/auth.json`; keyring-backed credentials are deferred.
 - Shared Codex auth cache refresh must preserve unrelated fields and avoid corrupting the auth file.

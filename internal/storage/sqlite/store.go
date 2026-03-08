@@ -171,7 +171,9 @@ func (s *Store) withImmediateTx(ctx context.Context, fn func(conn *sql.Conn) (se
 	if err != nil {
 		return session.Session{}, fmt.Errorf("acquire sqlite conn: %w", err)
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
 		return session.Session{}, fmt.Errorf("begin immediate tx: %w", err)
