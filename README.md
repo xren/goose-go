@@ -67,6 +67,20 @@ make eval
 
 `make eval` is a stable command shape for the future harness. In Milestone 00 it is intentionally a stub.
 
+To prove the current Codex provider path end to end, run:
+
+```sh
+go run ./cmd/goose-go provider-smoke
+```
+
+This uses the real `openai-codex` provider, reads the existing `codex login` cache, sends a tiny prompt, and streams the result to the terminal.
+
+To inspect the translated request, redacted headers, raw SSE events, and normalized provider events:
+
+```sh
+go run ./cmd/goose-go provider-smoke --debug
+```
+
 ## Current State
 
 The repo now has the first runtime foundation in place:
@@ -75,5 +89,6 @@ The repo now has the first runtime foundation in place:
 - design principles for future feature work are documented at the root
 - structured conversation types exist
 - a SQLite-backed session store exists with tests for create, load, append, replace, and replay
+- a real `openai-codex` provider exists with a minimal runtime smoke path
 
 The next milestone is the first provider implementation.

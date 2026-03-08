@@ -14,8 +14,8 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 | --- | --- | --- | --- | --- | --- |
 | 00 | Root setup, docs, and progress structure | done | none | Repo is the system of record and workflow targets are defined | 2026-03-08 |
 | 01 | Domain model and storage | done | 00 | Structured sessions can be created, loaded, and replayed | 2026-03-08 |
-| 02 | Provider foundation and Codex-first OpenAI provider | in_progress | 01 | Existing `codex login` user can complete streaming chat without an API key | 2026-03-08 |
-| 03 | Tool runtime and developer tools | planned | 01, 02 | In-process tools can be listed and executed | 2026-03-08 |
+| 02 | Provider foundation and Codex-first OpenAI provider | done | 01 | Existing `codex login` user can complete streaming chat without an API key | 2026-03-08 |
+| 03 | Tool runtime and developer tools | in_progress | 01, 02 | In-process tools can be listed and executed | 2026-03-08 |
 | 04 | Agent loop and approvals | planned | 02, 03 | Multi-turn tool-using loop works with approvals | 2026-03-08 |
 | 05 | CLI and session flow | planned | 04 | Terminal session can start, interrupt, resume, and render output | 2026-03-08 |
 | 06 | Compaction, evals, and hardening | planned | 04, 05 | Eval harness catches terminal-core regressions | 2026-03-08 |
@@ -23,13 +23,16 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 
 ## Current Focus
 
-- Continue Milestone 02.
+- Start Milestone 03.
 - Make the architecture executable before provider and agent code grow.
 - Use `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The first concrete provider is now documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.
 - The SQLite backend now lives under `internal/storage/sqlite`; the next work is provider and auth foundation on top of that split.
 - The provider interface, model config, usage metadata, architecture check, Codex auth/cache reader, and the first `openai-codex` provider now exist.
-- The next work is to tighten provider behavior around richer tool-call/event cases and then move up into the tool runtime and agent loop.
+- `cmd/goose-go provider-smoke` now exists as the minimal runtime proof path for the provider slice.
+- `cmd/goose-go provider-smoke --debug` now exposes the translated request, redacted headers, raw SSE events, and normalized provider events for inspection.
+- The real smoke path has been exercised successfully against local Codex auth and now documents the observed event sequence.
+- The next work is the tool runtime and first developer tools.
 - Keep native `goose-go` login out of the first slice.
 - Keep the `goose/` submodule as reference-only material.
 

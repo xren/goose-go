@@ -25,6 +25,7 @@ type Provider struct {
 	authReader *codexauth.Reader
 	baseURL    string
 	client     *http.Client
+	debugOut   io.Writer
 }
 
 type Option func(*Provider)
@@ -145,6 +146,12 @@ func WithAuthReader(reader *codexauth.Reader) Option {
 	}
 }
 
+func WithDebugWriter(w io.Writer) Option {
+	return func(p *Provider) {
+		p.debugOut = w
+	}
+}
+
 func (p *Provider) Stream(ctx context.Context, req provider.Request) (<-chan provider.Event, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -158,10 +165,14 @@ func (p *Provider) Stream(ctx context.Context, req provider.Request) (<-chan pro
 		return nil, err
 	}
 
+	debugPretty(p.debugOut, "normalized request", req)
+
 	body, err := buildRequestBody(req)
 	if err != nil {
 		return nil, err
 	}
+
+	debugPretty(p.debugOut, "codex request body", body)
 
 	payload, err := json.Marshal(body)
 	if err != nil {
@@ -173,7 +184,10 @@ func (p *Provider) Stream(ctx context.Context, req provider.Request) (<-chan pro
 		return nil, fmt.Errorf("build codex request: %w", err)
 	}
 
-	for key, value := range buildHeaders(creds) {
+	headers := buildHeaders(creds)
+	debugPretty(p.debugOut, "codex request headers", redactHeaders(headers))
+
+	for key, value := range headers {
 		httpReq.Header.Set(key, value)
 	}
 
@@ -193,7 +207,7 @@ func (p *Provider) Stream(ctx context.Context, req provider.Request) (<-chan pro
 		defer close(events)
 		defer func() { _ = resp.Body.Close() }()
 
-		if err := processStream(resp.Body, events); err != nil {
+		if err := processStream(resp.Body, events, p.debugOut); err != nil {
 			events <- provider.Event{Type: provider.EventTypeError, Err: err}
 		}
 	}()
@@ -321,7 +335,7 @@ func resolveURL(baseURL string) string {
 	}
 }
 
-func processStream(body io.Reader, events chan<- provider.Event) error {
+func processStream(body io.Reader, events chan<- provider.Event, debugOut io.Writer) error {
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
@@ -344,10 +358,14 @@ func processStream(body io.Reader, events chan<- provider.Event) error {
 			return fmt.Errorf("decode SSE event: %w", err)
 		}
 
+		debugPretty(debugOut, "raw sse event", event)
+
 		switch event.Type {
 		case "response.output_text.delta", "response.refusal.delta":
 			if event.Delta != "" {
-				events <- provider.Event{Type: provider.EventTypeTextDelta, Delta: event.Delta}
+				normalized := provider.Event{Type: provider.EventTypeTextDelta, Delta: event.Delta}
+				debugEvent(debugOut, normalized)
+				events <- normalized
 			}
 		case "response.output_item.done":
 			content, err := parseOutputItem(event.Item)
@@ -363,12 +381,18 @@ func processStream(body io.Reader, events chan<- provider.Event) error {
 				OutputTokens: event.Response.Usage.OutputTokens,
 				TotalTokens:  event.Response.Usage.TotalTokens,
 			}
-			events <- provider.Event{Type: provider.EventTypeUsage, Usage: usage}
+			usageEvent := provider.Event{Type: provider.EventTypeUsage, Usage: usage}
+			debugEvent(debugOut, usageEvent)
+			events <- usageEvent
 			if len(finalContent) > 0 {
 				message := conversation.NewMessage(conversation.RoleAssistant, finalContent...)
-				events <- provider.Event{Type: provider.EventTypeMessageComplete, Message: &message}
+				messageEvent := provider.Event{Type: provider.EventTypeMessageComplete, Message: &message}
+				debugEvent(debugOut, messageEvent)
+				events <- messageEvent
 			}
-			events <- provider.Event{Type: provider.EventTypeDone}
+			doneEvent := provider.Event{Type: provider.EventTypeDone}
+			debugEvent(debugOut, doneEvent)
+			events <- doneEvent
 		case "error", "response.failed":
 			return fmt.Errorf("codex error %s: %s", event.Code, event.Message)
 		}
@@ -485,4 +509,60 @@ func compactJSON(raw json.RawMessage) string {
 		return string(raw)
 	}
 	return string(out)
+}
+
+func debugPretty(w io.Writer, title string, value any) {
+	if w == nil {
+		return
+	}
+
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		_, _ = fmt.Fprintf(w, "\n=== %s ===\n<marshal error: %v>\n", title, err)
+		return
+	}
+
+	_, _ = fmt.Fprintf(w, "\n=== %s ===\n%s\n", title, data)
+}
+
+func debugEvent(w io.Writer, event provider.Event) {
+	if w == nil {
+		return
+	}
+
+	payload := map[string]any{
+		"type": event.Type,
+	}
+	if event.Delta != "" {
+		payload["delta"] = event.Delta
+	}
+	if event.Usage != nil {
+		payload["usage"] = event.Usage
+	}
+	if event.Message != nil {
+		payload["message"] = event.Message
+	}
+	if event.Err != nil {
+		payload["error"] = event.Err.Error()
+	}
+	debugPretty(w, "normalized event", payload)
+}
+
+func redactHeaders(headers map[string]string) map[string]string {
+	out := make(map[string]string, len(headers))
+	for key, value := range headers {
+		out[key] = value
+	}
+	if token, ok := out["Authorization"]; ok && strings.HasPrefix(token, "Bearer ") {
+		raw := strings.TrimPrefix(token, "Bearer ")
+		out["Authorization"] = "Bearer " + redactToken(raw)
+	}
+	return out
+}
+
+func redactToken(token string) string {
+	if len(token) <= 12 {
+		return "REDACTED"
+	}
+	return token[:6] + "..." + token[len(token)-4:]
 }

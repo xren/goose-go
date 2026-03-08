@@ -57,6 +57,58 @@ sequenceDiagram
     Provider-->>Agent: text_delta / usage / message_complete / done
 ```
 
+## Observed Smoke Sequence
+
+The following sequence was observed from a real `go run ./cmd/goose-go provider-smoke --debug` run against local Codex auth on 2026-03-08.
+
+```mermaid
+sequenceDiagram
+    participant CLI as provider-smoke
+    participant Provider as openaicodex.Provider
+    participant API as Codex SSE API
+
+    CLI->>Provider: normalized request
+    Provider->>API: POST /backend-api/codex/responses
+    API-->>Provider: response.created
+    API-->>Provider: response.in_progress
+    API-->>Provider: response.output_item.added (reasoning)
+    API-->>Provider: response.output_item.done (reasoning)
+    API-->>Provider: response.output_item.added (message)
+    API-->>Provider: response.content_part.added
+    API-->>Provider: response.output_text.delta ("pong")
+    Provider-->>CLI: text_delta
+    API-->>Provider: response.output_text.done
+    API-->>Provider: response.content_part.done
+    API-->>Provider: response.output_item.done (message)
+    API-->>Provider: response.completed (usage)
+    Provider-->>CLI: usage
+    Provider-->>CLI: message_complete
+    Provider-->>CLI: done
+```
+
+Observed normalized output from that run:
+
+- `text_delta`: `pong`
+- `usage`: `input_tokens=26`, `output_tokens=23`, `total_tokens=49`
+- `message_complete`: assistant text message `pong`
+- `done`
+
+Observed raw SSE lifecycle from that run:
+
+- `response.created`
+- `response.in_progress`
+- `response.output_item.added` for `reasoning`
+- `response.output_item.done` for `reasoning`
+- `response.output_item.added` for `message`
+- `response.content_part.added`
+- `response.output_text.delta`
+- `response.output_text.done`
+- `response.content_part.done`
+- `response.output_item.done` for `message`
+- `response.completed`
+
+Not every raw event currently maps to a normalized provider event. The current provider normalizes the events that matter to the runtime and ignores intermediate lifecycle noise.
+
 ## Internal Responsibilities
 
 The package currently has four responsibilities.

@@ -6,7 +6,7 @@ Add the provider foundation needed for the core runtime, while tightening packag
 
 ## Status
 
-in_progress
+done
 
 ## Dependencies
 
@@ -66,4 +66,6 @@ in_progress
 - `internal/auth/codex` now owns file-backed Codex credential loading, JWT-derived metadata, token refresh, and atomic auth-file rewrite.
 - `internal/provider/openaicodex` now provides the first concrete provider with SSE streaming, request translation, auth header construction, and normalized final assistant messages.
 - `internal/provider/openaicodex/ARCHITECTURE.md` now documents the high-level provider architecture, boundaries, and event flow for fresh-agent handoff.
+- `cmd/goose-go provider-smoke` now provides the minimal runtime path needed to prove the milestone acceptance criterion against the real provider/auth flow.
+- The real smoke path has been exercised successfully against local Codex auth, and the observed raw SSE lifecycle is now documented in `internal/provider/openaicodex/ARCHITECTURE.md`.
 - The filename still reflects older wording, but the active milestone scope is now Codex-first provider foundation.
