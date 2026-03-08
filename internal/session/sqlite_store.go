@@ -18,6 +18,14 @@ type SQLiteStore struct {
 	db *sql.DB
 }
 
+type sessionQueryer interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+type sessionExecer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 func NewSQLiteStore(path string) (*SQLiteStore, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("create db dir: %w", err)
@@ -27,6 +35,9 @@ func NewSQLiteStore(path string) (*SQLiteStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
+
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 
 	store := &SQLiteStore{db: db}
 	if err := store.migrate(context.Background()); err != nil {
@@ -83,7 +94,86 @@ func (s *SQLiteStore) CreateSession(ctx context.Context, params CreateParams) (S
 }
 
 func (s *SQLiteStore) GetSession(ctx context.Context, id string) (Session, error) {
-	row := s.db.QueryRowContext(
+	return getSession(ctx, s.db, id)
+}
+
+func (s *SQLiteStore) AddMessage(ctx context.Context, sessionID string, message conversation.Message) (Session, error) {
+	if err := message.Validate(); err != nil {
+		return Session{}, err
+	}
+
+	return s.withImmediateTx(ctx, func(conn *sql.Conn) (Session, error) {
+		session, err := getSession(ctx, conn, sessionID)
+		if err != nil {
+			return Session{}, err
+		}
+
+		if err := session.Conversation.Append(message); err != nil {
+			return Session{}, err
+		}
+
+		return persistConversation(ctx, conn, session)
+	})
+}
+
+func (s *SQLiteStore) ReplaceConversation(ctx context.Context, sessionID string, conv conversation.Conversation) (Session, error) {
+	if err := conv.Validate(); err != nil {
+		return Session{}, err
+	}
+
+	return s.withImmediateTx(ctx, func(conn *sql.Conn) (Session, error) {
+		session, err := getSession(ctx, conn, sessionID)
+		if err != nil {
+			return Session{}, err
+		}
+
+		session.Conversation = conv
+		return persistConversation(ctx, conn, session)
+	})
+}
+
+func (s *SQLiteStore) ReplayConversation(ctx context.Context, sessionID string) (conversation.Conversation, error) {
+	session, err := s.GetSession(ctx, sessionID)
+	if err != nil {
+		return conversation.Conversation{}, err
+	}
+	return session.Conversation.Clone(), nil
+}
+
+func (s *SQLiteStore) withImmediateTx(ctx context.Context, fn func(conn *sql.Conn) (Session, error)) (Session, error) {
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return Session{}, fmt.Errorf("acquire sqlite conn: %w", err)
+	}
+	defer conn.Close()
+
+	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		return Session{}, fmt.Errorf("begin immediate tx: %w", err)
+	}
+
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		_, _ = conn.ExecContext(context.Background(), "ROLLBACK")
+	}()
+
+	session, err := fn(conn)
+	if err != nil {
+		return Session{}, err
+	}
+
+	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
+		return Session{}, fmt.Errorf("commit tx: %w", err)
+	}
+
+	committed = true
+	return session, nil
+}
+
+func getSession(ctx context.Context, queryer sessionQueryer, id string) (Session, error) {
+	row := queryer.QueryRowContext(
 		ctx,
 		`SELECT id, name, working_dir, type, created_at, updated_at, message_count, conversation_json
 		 FROM sessions WHERE id = ?`,
@@ -119,42 +209,7 @@ func (s *SQLiteStore) GetSession(ctx context.Context, id string) (Session, error
 	return session, nil
 }
 
-func (s *SQLiteStore) AddMessage(ctx context.Context, sessionID string, message conversation.Message) (Session, error) {
-	session, err := s.GetSession(ctx, sessionID)
-	if err != nil {
-		return Session{}, err
-	}
-
-	if err := session.Conversation.Append(message); err != nil {
-		return Session{}, err
-	}
-
-	return s.persistConversation(ctx, session)
-}
-
-func (s *SQLiteStore) ReplaceConversation(ctx context.Context, sessionID string, conv conversation.Conversation) (Session, error) {
-	if err := conv.Validate(); err != nil {
-		return Session{}, err
-	}
-
-	session, err := s.GetSession(ctx, sessionID)
-	if err != nil {
-		return Session{}, err
-	}
-
-	session.Conversation = conv
-	return s.persistConversation(ctx, session)
-}
-
-func (s *SQLiteStore) ReplayConversation(ctx context.Context, sessionID string) (conversation.Conversation, error) {
-	session, err := s.GetSession(ctx, sessionID)
-	if err != nil {
-		return conversation.Conversation{}, err
-	}
-	return session.Conversation.Clone(), nil
-}
-
-func (s *SQLiteStore) persistConversation(ctx context.Context, session Session) (Session, error) {
+func persistConversation(ctx context.Context, execer sessionExecer, session Session) (Session, error) {
 	now := time.Now().UTC().Unix()
 	session.UpdatedAt = now
 	session.MessageCount = len(session.Conversation.Messages)
@@ -164,7 +219,7 @@ func (s *SQLiteStore) persistConversation(ctx context.Context, session Session) 
 		return Session{}, fmt.Errorf("marshal conversation: %w", err)
 	}
 
-	result, err := s.db.ExecContext(
+	result, err := execer.ExecContext(
 		ctx,
 		`UPDATE sessions
 		 SET updated_at = ?, message_count = ?, conversation_json = ?

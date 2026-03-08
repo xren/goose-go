@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"goose-go/internal/conversation"
@@ -85,6 +86,63 @@ func TestSQLiteStoreMissingSession(t *testing.T) {
 
 	if _, err := store.GetSession(ctx, "missing"); err != ErrSessionNotFound {
 		t.Fatalf("expected ErrSessionNotFound, got %v", err)
+	}
+}
+
+func TestSQLiteStoreAddMessageConcurrent(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	created, err := store.CreateSession(ctx, CreateParams{
+		Name:       "concurrent",
+		WorkingDir: t.TempDir(),
+		Type:       TypeUser,
+	})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	const writers = 8
+
+	start := make(chan struct{})
+	errCh := make(chan error, writers)
+	var wg sync.WaitGroup
+
+	for i := range writers {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+
+			msg := conversation.NewMessage(
+				conversation.RoleUser,
+				conversation.Text("message"),
+				conversation.ToolRequest("tool_1", "shell", json.RawMessage(`{"command":"pwd"}`)),
+			)
+
+			if _, err := store.AddMessage(ctx, created.ID, msg); err != nil {
+				errCh <- err
+			}
+		}(i)
+	}
+
+	close(start)
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		if err != nil {
+			t.Fatalf("concurrent add message: %v", err)
+		}
+	}
+
+	replayed, err := store.ReplayConversation(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("replay conversation: %v", err)
+	}
+
+	if got := len(replayed.Messages); got != writers {
+		t.Fatalf("expected %d replayed messages, got %d", writers, got)
 	}
 }
 
