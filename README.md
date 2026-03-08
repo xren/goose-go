@@ -127,6 +127,55 @@ go run ./cmd/goose-go run --session <session-id> "continue from here"
 Press `Ctrl-C` during `goose-go run` to cancel the active run cleanly. The current persisted session state is kept and the CLI renders the transcript captured so far.
 Each `goose-go run` also writes a per-session JSONL trace under `.goose-go/traces/` by default.
 
+## How A Run Works
+
+At a high level, one CLI run now follows this path:
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CLI as cmd/goose-go
+    participant APP as internal/app
+    participant STORE as session.Store
+    participant AGENT as internal/agent
+    participant PROVIDER as internal/provider
+    participant MODEL as openaicodex
+    participant TOOLS as tools.Registry
+
+    U->>CLI: enter prompt
+    CLI->>APP: RunAgent(prompt, session?)
+    APP->>STORE: create or load session
+    APP->>AGENT: ReplyStream(session, prompt)
+
+    AGENT->>STORE: persist user message
+    AGENT->>AGENT: rebuild active context
+    AGENT->>AGENT: compact if needed
+    AGENT->>PROVIDER: request(context)
+    PROVIDER->>MODEL: stream request
+    MODEL-->>PROVIDER: text deltas or tool calls
+    PROVIDER-->>AGENT: normalized events
+
+    loop streaming text
+        AGENT-->>APP: provider_text_delta
+        APP-->>CLI: render partial output
+        CLI-->>U: user sees response stream
+    end
+
+    AGENT->>STORE: persist assistant message
+
+    alt no tool call
+        AGENT-->>APP: run_completed
+        APP-->>CLI: final render
+    else tool call requested
+        AGENT->>TOOLS: execute tool
+        TOOLS-->>AGENT: tool result
+        AGENT->>STORE: persist tool message
+        AGENT->>PROVIDER: continue with tool result
+    end
+```
+
+This is the current runtime shape, not a future-state sketch: the CLI renders from the live agent event stream, sessions persist at each step, and tool execution can trigger another provider turn before the run completes.
+
 ## Current State
 
 The repo now has the first runtime foundation in place:
@@ -136,7 +185,11 @@ The repo now has the first runtime foundation in place:
 - structured conversation types exist
 - a SQLite-backed session store exists with tests for create, load, append, replace, and replay
 - a real `openai-codex` provider exists with a minimal runtime smoke path
-- an initial `internal/agent` loop exists for multi-turn replies, tool dispatch, max-turn limits, and approval handling
+- an `internal/agent` loop exists for multi-turn replies, tool dispatch, max-turn limits, approval handling, and live event streaming
+- `goose-go run` now renders from that live event stream instead of waiting for a completed transcript
+- `goose-go run` can list, resume, and interrupt persisted sessions cleanly
+- per-session JSONL traces are written from the same event stream used for terminal rendering
+- context compaction is integrated into the agent loop and persisted through the session/store boundary
+- `make eval` runs a first deterministic trace-based runtime eval suite
 
 The current milestone is now the event-stream and hardening layer; the basic CLI/session surface is in place, including interrupt handling and per-session event traces.
-`goose-go run` now renders from the live agent event stream rather than waiting for the full transcript at the end of a run.
