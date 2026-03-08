@@ -11,7 +11,7 @@ Introduce a token-based theme system for `goose-go`'s TUI, following the useful 
 
 ## Status
 
-planned
+in_progress
 
 ## Dependencies
 
@@ -117,6 +117,8 @@ The TUI renderer should consume semantic helpers, not raw ANSI constants spread 
 
 ### Phase 1: Internal Tokenization
 
+Status: done
+
 Tasks:
 
 - define semantic tokens
@@ -128,6 +130,8 @@ Acceptance:
 - TUI colors are driven from one shared theme source
 
 ### Phase 2: Startup Selection
+
+Status: done
 
 Tasks:
 
@@ -141,6 +145,8 @@ Acceptance:
 
 ### Phase 3: File-Backed Custom Themes
 
+Status: planned
+
 Tasks:
 
 - define a JSON theme file shape
@@ -152,6 +158,8 @@ Acceptance:
 - custom themes can be added without changing code
 
 ### Phase 4: Hot Reload
+
+Status: planned
 
 Tasks:
 
@@ -173,6 +181,12 @@ Acceptance:
 - No major TUI surface depends on one-off hard-coded color choices.
 - Built-in dark/light themes render the same interface structure with different token values.
 - The theme package is narrow enough that adding file-backed themes later does not require a TUI rewrite.
+
+Current note:
+
+- `internal/tui/theme` now owns the semantic token set and built-in `dark`/`light` palettes
+- `goose-go tui --theme <name>` now selects the startup theme
+- `/theme` inside the TUI now opens a built-in theme picker
 
 ## Notes
 

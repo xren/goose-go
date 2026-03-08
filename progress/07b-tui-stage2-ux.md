@@ -207,7 +207,8 @@ Acceptance:
 
 Current note:
 - approval, model selection, recent-session picking, grouped tool blocks, and the first local command set are now in place
-- remaining Stage 2 work is about making those surfaces feel like one interface system rather than independent widgets
+- shared panel styling, transcript hierarchy, and built-in tokenized dark/light themes are now in place
+- remaining Stage 2 work is about interaction-surface polish, richer command surfaces, and eventual custom themes
 
 ### Phase 6: Styling and layout standardization
 

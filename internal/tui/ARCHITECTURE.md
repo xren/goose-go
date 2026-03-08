@@ -27,6 +27,7 @@ This package now contains the full Stage 1 MVP plus the first Stage 2 interactio
 - grouped tool blocks plus compaction and failure notices
 - interrupt of the active run
 - registry-backed model selection through `/model`
+- built-in dark/light theme selection through `--theme` and `/theme`
 - recent-session entry through `/sessions` and `Ctrl-R`
 
 Shell execution now requires approval on the TUI surface, and approval-required runs are handled inside the TUI through a focused approval panel backed by the existing approval continuation seam in `internal/agent` and `internal/app`.
@@ -161,6 +162,7 @@ Rendering rules:
 - final assistant messages replace that live buffer to avoid duplicate output
 - each tool call is grouped into one logical transcript block keyed by tool call id
 - grouped tool blocks carry args, lifecycle status, and final output/error text
+- grouped tool blocks are width-capped and wrapped inside the viewport instead of stretching to the full terminal width
 - compaction and failure events render as system notices
 
 Current transcript replay behavior:
@@ -182,26 +184,32 @@ Current implementation detail:
 - `Ctrl-C` or `Esc` interrupts the active run when running
 - `Ctrl-D` quits only when idle
 - `Ctrl-R` opens the recent-session picker when idle
+- `PageUp` / `PageDown` scroll the transcript viewport without leaving the composer
+- mouse wheel / trackpad scrolling now drives the transcript viewport directly
+- `Home` / `End` jump to the top or bottom of transcript history
+- the transcript only auto-follows new output when the viewport is already at the bottom; if the user scrolls up, new output does not yank the viewport back down
 - `/help` lists the current local command surface
 - `/session` reports current session metadata from TUI/runtime state
 - `/new` resets the interactive surface to a fresh session state
+- `/theme` is handled locally in the TUI, opens a built-in theme picker, and updates only TUI presentation state
 - shell-triggered approval-required runs open a focused approval panel with allow/deny actions
 - `/model` is handled locally in the TUI, opens a registry-backed picker, and does not start a provider run
 - `/sessions` is handled locally in the TUI, opens a recent-session picker, and loads the selected session through the runtime boundary
 - the TUI root context is now long-lived and cancelable, not capped by a fixed 5-minute deadline
+- TUI styling is now driven by semantic tokens in [theme/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/theme/ARCHITECTURE.md) instead of scattered color literals
 
 ## Current Gaps
 
 Remaining Stage 2 work:
 
 1. richer command surfaces
-2. navigation and status polish
-3. command-surface expansion beyond `/model` and `/sessions`
+2. interaction-surface polish
+3. custom theme loading and hot reload
 
 ## Next Steps
 
 The next TUI work stays in Stage 2:
 
 1. richer command surfaces
-2. navigation and status polish
-3. command-surface expansion beyond `/model` and `/sessions`
+2. interaction-surface polish
+3. custom theme loading and hot reload

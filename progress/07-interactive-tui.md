@@ -46,7 +46,10 @@ Current note:
 - the TUI `/model` picker is now implemented on top of the registry-backed selection path
 - the TUI recent-session picker is now implemented on top of `ListSessions(...)` through `/sessions` and `Ctrl-R`
 - tool lifecycle is now rendered as grouped transcript blocks in the TUI instead of flat request/result lines
+- grouped tool blocks are now width-capped and wrapped inside the viewport so long outputs do not mangle the transcript layout
 - the first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`
+- built-in dark/light theme selection is now available through `--theme` and the TUI-local `/theme` picker
+- the transcript viewport now supports mouse-wheel scrolling plus explicit history navigation through `PageUp` / `PageDown` and `Home` / `End`, and it no longer auto-snaps to bottom while the user is reading older output
 - `goose-go run /model` remains a local reporter, while `goose-go tui /model` now opens the picker
 - the next Stage 2 work now includes a dedicated styling/layout pass and a token-based theme plan inspired by `pi-mono`
 
@@ -72,5 +75,6 @@ Current note:
   - [07a-tui-stage1-mvp.md](/Users/rex/projects/goose-go/progress/07a-tui-stage1-mvp.md)
   - [07b-tui-stage2-ux.md](/Users/rex/projects/goose-go/progress/07b-tui-stage2-ux.md)
   - [07c-tui-architecture.md](/Users/rex/projects/goose-go/progress/07c-tui-architecture.md)
+  - [07d-model-registry-and-selection.md](/Users/rex/projects/goose-go/progress/07d-model-registry-and-selection.md)
   - [07e-tui-styling-and-layout.md](/Users/rex/projects/goose-go/progress/07e-tui-styling-and-layout.md)
   - [07f-tui-theme-system.md](/Users/rex/projects/goose-go/progress/07f-tui-theme-system.md)

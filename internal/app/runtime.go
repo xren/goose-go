@@ -28,6 +28,7 @@ type Runtime struct {
 }
 
 const defaultProviderName = "openai-codex"
+const defaultMaxTurns = 10000
 
 var newRunProvider = func(debugOut io.Writer) (provider.Provider, error) {
 	if debugOut != nil {
@@ -46,7 +47,7 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 		return nil, err
 	}
 	if opts.MaxTurns <= 0 {
-		opts.MaxTurns = 8
+		opts.MaxTurns = defaultMaxTurns
 	}
 	selection, err := resolveRuntimeSelection(opts)
 	if err != nil {

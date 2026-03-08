@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"goose-go/internal/app"
+	tuitheme "goose-go/internal/tui/theme"
 )
 
 func (m *model) handleLocalCommand(prompt string) bool {
@@ -14,7 +15,7 @@ func (m *model) handleLocalCommand(prompt string) bool {
 		m.status = "idle"
 		m.items = append(m.items,
 			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "/help"},
-			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "commands:\n/model\n/sessions\n/session\n/new\n/help"},
+			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "commands:\n/model\n/theme\n/sessions\n/session\n/new\n/help"},
 		)
 		return true
 	case "/session":
@@ -24,7 +25,7 @@ func (m *model) handleLocalCommand(prompt string) bool {
 		m.status = "idle"
 		m.items = append(m.items,
 			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "/session"},
-			transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("session: %s\ncwd: %s\nprovider: %s\nmodel: %s", sessionID, cwd, providerName, modelName)},
+			transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("session: %s\ncwd: %s\nprovider: %s\nmodel: %s\ntheme: %s", sessionID, cwd, providerName, modelName, m.theme.Name)},
 		)
 		return true
 	case "/new":
@@ -39,6 +40,15 @@ func (m *model) handleLocalCommand(prompt string) bool {
 		m.approval = approvalViewState{}
 		m.picker = modelPickerState{}
 		m.sessions = sessionPickerState{}
+		m.layout()
+		return true
+	case "/theme":
+		m.themes = themePickerState{
+			Open:     true,
+			Items:    tuitheme.Available(),
+			Selected: selectedThemeIndex(tuitheme.Available(), m.theme.Name),
+		}
+		m.status = "select theme"
 		m.layout()
 		return true
 	}

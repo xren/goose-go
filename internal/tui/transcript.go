@@ -9,6 +9,7 @@ import (
 
 	"goose-go/internal/conversation"
 	"goose-go/internal/tools"
+	tuitheme "goose-go/internal/tui/theme"
 )
 
 func buildTranscriptFromConversation(conv conversation.Conversation) []transcriptItem {
@@ -60,31 +61,74 @@ func appendMessageItems(items *[]transcriptItem, message conversation.Message) {
 	}
 }
 
-func renderItems(items []transcriptItem, width int) string {
+func renderItems(theme tuitheme.Palette, items []transcriptItem, width int) string {
 	lines := make([]string, 0, len(items))
 	for _, item := range items {
+		lines = append(lines, renderItem(theme, item, width))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func renderItem(theme tuitheme.Palette, item transcriptItem, width int) string {
+	text := strings.TrimRight(item.Text, "\n")
+	switch item.Kind {
+	case kindUser:
+		style := lipgloss.NewStyle().Background(theme.UserBG).Foreground(theme.UserText).Padding(0, 1)
+		return style.Render("user> " + text)
+	case kindAssistant, kindLiveBuffer:
+		label := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).Render("assistant>")
+		body := lipgloss.NewStyle().Foreground(theme.AssistantText).Render(" " + text)
+		return label + body
+	case kindSystem:
+		label := lipgloss.NewStyle().Foreground(theme.NoticeText).Bold(true).Render("system>")
+		body := lipgloss.NewStyle().Foreground(theme.SystemText).Render(" " + text)
+		return label + body
+	case kindError:
+		label := lipgloss.NewStyle().Foreground(theme.Error).Bold(true).Render("error>")
+		body := lipgloss.NewStyle().Foreground(theme.Error).Render(" " + text)
+		return label + body
+	case kindTool:
+		return renderToolItem(theme, item, width)
+	default:
 		prefix := item.Prefix
 		if prefix == "" {
 			prefix = string(item.Kind)
 		}
-		text := strings.TrimRight(item.Text, "\n")
-		parts := strings.Split(text, "\n")
-		for i, part := range parts {
-			if i == 0 {
-				lines = append(lines, fmt.Sprintf("%s> %s", prefix, part))
-				continue
-			}
-			lines = append(lines, fmt.Sprintf("%s  %s", strings.Repeat(" ", len(prefix)), part))
-		}
-		if len(parts) == 0 {
-			lines = append(lines, prefix+"> ")
-		}
+		return fmt.Sprintf("%s> %s", prefix, text)
 	}
-	content := strings.Join(lines, "\n")
+}
+
+func renderToolItem(theme tuitheme.Palette, item transcriptItem, width int) string {
+	status := strings.TrimSpace(item.Meta)
+	bg := theme.ToolPendingBG
+	border := theme.Border
+	switch status {
+	case "running":
+		bg = theme.ToolRunningBG
+		border = theme.BorderActive
+	case "completed":
+		bg = theme.ToolSuccessBG
+		border = theme.Success
+	case "error":
+		bg = theme.ToolErrorBG
+		border = theme.Error
+	}
+
+	cardWidth := 96
 	if width > 0 {
-		return lipgloss.NewStyle().Width(width).Render(content)
+		cardWidth = min(max(40, width-4), 96)
 	}
-	return content
+	innerWidth := max(20, cardWidth-4)
+	title := lipgloss.NewStyle().Foreground(theme.ToolTitle).Bold(true).Render(item.Prefix)
+	meta := lipgloss.NewStyle().Foreground(theme.Muted).Render(" " + status)
+	header := lipgloss.NewStyle().Width(innerWidth).Render(title + meta)
+	body := lipgloss.NewStyle().Foreground(theme.ToolOutput).Width(innerWidth).Render(strings.TrimSpace(item.Text))
+	style := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(border).
+		Background(bg).
+		Padding(0, 1)
+	return style.Render(header + "\n" + body)
 }
 
 func upsertToolGroup(items *[]transcriptItem, call tools.Call, status string) {

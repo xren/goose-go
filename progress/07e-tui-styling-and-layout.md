@@ -8,7 +8,7 @@ This plan focuses on layout structure, visual hierarchy, and reusable rendering 
 
 ## Status
 
-planned
+in_progress
 
 ## Dependencies
 
@@ -38,6 +38,7 @@ These are the parts worth porting.
 - make grouped tool blocks visually distinct by lifecycle state
 - add visible keyboard-hint surfaces where they materially reduce friction
 - add transcript and footer polish that improves long interactive sessions
+- make transcript history navigable with mouse-wheel scrolling plus explicit scroll and jump bindings
 
 ## Scope Out
 
@@ -101,6 +102,7 @@ Within each block:
 - title row: tool name + status
 - metadata row: args or selected fields
 - body: output preview
+- width-capped card layout so long outputs wrap inside the viewport instead of producing oversized full-width blocks
 
 Do not flatten all tool output into the same transcript style as assistant text.
 
@@ -139,6 +141,8 @@ Do not jump straight to a crowded footer before the basic layout settles.
 
 ### Phase 1: Shared Panel Styling
 
+Status: done
+
 Tasks:
 
 - introduce common panel rendering helpers for bordered overlays and pickers
@@ -150,6 +154,8 @@ Acceptance:
 - picker and approval surfaces look intentionally related instead of separately improvised
 
 ### Phase 2: Transcript Hierarchy Pass
+
+Status: done
 
 Tasks:
 
@@ -163,6 +169,8 @@ Acceptance:
 
 ### Phase 3: Footer And Status Polish
 
+Status: done
+
 Tasks:
 
 - make the footer a stable operational surface
@@ -174,6 +182,8 @@ Acceptance:
 - users can orient themselves without opening `/session` repeatedly
 
 ### Phase 4: Interaction-Surface Polish
+
+Status: planned
 
 Tasks:
 
@@ -200,6 +210,12 @@ Acceptance:
 - The TUI has a stable, intentional layout model instead of incremental one-off styling.
 - Approval, model selection, and session selection look like parts of one interface family.
 - Tool-heavy sessions are materially easier to read than the current flat transcript treatment.
+
+Current note:
+
+- shared panel styling is now in place for approval, model, session, and theme pickers
+- transcript rendering now applies stronger hierarchy for user, assistant, system, and grouped tool blocks
+- footer and header surfaces are now more structured and carry model/theme/session context
 
 ## Notes
 

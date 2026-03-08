@@ -11,6 +11,7 @@ import (
 	"goose-go/internal/app"
 	"goose-go/internal/models"
 	"goose-go/internal/session"
+	tuitheme "goose-go/internal/tui/theme"
 )
 
 type sessionLoadedMsg struct {
@@ -184,6 +185,15 @@ func selectedSessionIndex(items []session.Summary, sessionID string) int {
 	}
 	for i, item := range items {
 		if item.ID == sessionID {
+			return i
+		}
+	}
+	return 0
+}
+
+func selectedThemeIndex(items []tuitheme.Name, current string) int {
+	for i, item := range items {
+		if string(item) == current {
 			return i
 		}
 	}

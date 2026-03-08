@@ -39,6 +39,7 @@ The [goose](/Users/rex/projects/goose-go/goose) submodule is the reference imple
 - [internal/provider/openaicodex/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/provider/openaicodex/ARCHITECTURE.md): high-level architecture of the first concrete provider
 - [internal/evals/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/evals/ARCHITECTURE.md): deterministic runtime eval harness and trace-based regression model
 - [internal/tui/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/ARCHITECTURE.md): Bubble Tea frontend architecture over the live agent event stream
+- [internal/tui/theme/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/theme/ARCHITECTURE.md): semantic TUI theme tokens and built-in dark/light theme model
 - [docs/invariants.md](/Users/rex/projects/goose-go/docs/invariants.md): hard rules for the project
 - [docs/goose-reference.md](/Users/rex/projects/goose-go/docs/goose-reference.md): what to copy, defer, or ignore from upstream Goose
 - [docs/evals.md](/Users/rex/projects/goose-go/docs/evals.md): future smoke and eval strategy
@@ -139,10 +140,11 @@ To open the Stage 1 TUI:
 
 ```sh
 go run ./cmd/goose-go tui
+go run ./cmd/goose-go tui --theme light
 go run ./cmd/goose-go tui --session <session-id>
 ```
 
-Inside the TUI, `/model` opens the registry-backed model picker, `/sessions` opens the recent-session picker, `/session` reports current session metadata, `/new` resets to a fresh session state, and `/help` lists the local commands.
+Inside the TUI, `/model` opens the registry-backed model picker, `/theme` opens the built-in theme picker, `/sessions` opens the recent-session picker, `/session` reports current session metadata, `/new` resets to a fresh session state, and `/help` lists the local commands.
 `goose-go run` cancels cleanly on `Ctrl-C`, writes per-session JSONL traces under `.goose-go/traces/`, and shares the same runtime/session path as the TUI.
 
 ## TUI Manual Test Runbook
@@ -151,14 +153,13 @@ Inside the TUI, `/model` opens the registry-backed model picker, `/sessions` ope
 ```sh
 go run ./cmd/goose-go tui
 ```
-- the Bubble Tea screen opens with `session: new` and `status: idle`
+- Verify the Bubble Tea screen opens with `session: new` and `status: idle`.
 
 2. Submit a simple prompt:
 ```text
 Reply with the single word: pong
 ```
-- status moves through `starting` to `running` to `completed`
-- a session id appears and the response streams into the transcript
+- Verify status moves through `starting` to `running` to `completed`, and the response streams into the transcript.
 
 3. Exercise tool activity:
 ```text
@@ -202,7 +203,6 @@ Verify:
 - an approval panel opens inside the TUI by default for shell execution
 - `a` or `y` approves and continues the run
 - `d` or `n` denies and keeps the run inside the TUI
-
 8. Exercise model selection in the TUI:
 ```text
 /model
@@ -211,7 +211,6 @@ Verify:
 - a model picker opens with the current model preselected
 - unavailable models remain visible with a reason
 - pressing `Enter` on an available model updates the active runtime selection
-
 9. Exercise session selection in the TUI:
 ```text
 /sessions
@@ -220,17 +219,19 @@ Or press `Ctrl-R`.
 - a recent-session picker opens inside the TUI
 - selecting a session replays its transcript
 - the resumed session adopts its persisted provider/model through the shared runtime path
-
 10. Exercise the local command surface in the TUI:
 ```text
 /help
+/theme
 /session
 /new
 ```
-- `/help` lists the local commands
-- `/session` reports current session metadata without calling the model
-- `/new` clears the active transcript into a fresh interactive session state
-
+- Verify `/help` lists commands, `/theme` opens the built-in theme picker, `/session` reports metadata, and `/new` resets the interactive state.
+11. Exercise transcript history scrolling in the TUI:
+- use the mouse wheel or trackpad to scroll through older transcript content
+- press `PageUp` / `PageDown` to scroll through older transcript content
+- press `Home` / `End` to jump to the top or bottom
+- verify that while scrolled up, new assistant or tool output does not force the viewport back to the bottom
 ## How A Run Works
 
 At a high level, one CLI run now follows this path:
@@ -279,7 +280,6 @@ sequenceDiagram
 ```
 
 This is the current runtime shape, not a future-state sketch: the CLI renders from the live agent event stream, sessions persist at each step, and tool execution can trigger another provider turn before the run completes.
-
 ## Current State
 
 The repo now has the first runtime foundation in place:

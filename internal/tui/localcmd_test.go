@@ -53,3 +53,21 @@ func TestNewCommandResetsInteractiveState(t *testing.T) {
 		t.Fatalf("expected reset transcript, got %#v", m.items)
 	}
 }
+
+func TestThemeCommandOpensThemePicker(t *testing.T) {
+	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+	m.input.SetValue("/theme")
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+
+	if !m.themes.Open {
+		t.Fatal("expected theme picker to open")
+	}
+	if m.status != "select theme" {
+		t.Fatalf("expected select theme status, got %q", m.status)
+	}
+	if len(m.themes.Items) == 0 {
+		t.Fatal("expected built-in themes to be available")
+	}
+}

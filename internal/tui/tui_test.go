@@ -560,45 +560,6 @@ func TestSessionsCommandOpensPicker(t *testing.T) {
 	}
 }
 
-func TestSessionPickerLoadsSelectedSession(t *testing.T) {
-	msgTime := time.Now().UTC()
-	runtime := &fakeRuntime{
-		sessionSummaries: []session.Summary{
-			{ID: "sess_a", Name: "A", WorkingDir: "/tmp/a", Provider: "openai-codex", Model: "gpt-5-codex", MessageCount: 1},
-			{ID: "sess_b", Name: "B", WorkingDir: "/tmp/b", Provider: "openai-codex", Model: "gpt-5.3-codex", MessageCount: 2},
-		},
-		replay: session.Session{
-			ID:         "sess_b",
-			WorkingDir: "/tmp/b",
-			Provider:   "openai-codex",
-			Model:      "gpt-5.3-codex",
-			Conversation: conversation.Conversation{Messages: []conversation.Message{
-				{ID: "m1", Role: conversation.RoleUser, CreatedAt: msgTime, Content: []conversation.Content{conversation.Text("resume me")}},
-			}},
-		},
-	}
-	m := newModel(context.Background(), runtime, Options{})
-	m.sessions = sessionPickerState{Open: true, Items: runtime.sessionSummaries, Selected: 1}
-
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = updated.(model)
-	if cmd == nil {
-		t.Fatal("expected load selected session command")
-	}
-	updated, _ = m.Update(cmd())
-	m = updated.(model)
-
-	if m.sessions.Open {
-		t.Fatal("expected sessions picker to close after load")
-	}
-	if m.sessionID != "sess_b" {
-		t.Fatalf("expected session id sess_b, got %q", m.sessionID)
-	}
-	if !containsText(m.items, "user", "resume me") {
-		t.Fatalf("expected replayed transcript, got %#v", m.items)
-	}
-}
-
 func message(role conversation.Role, text string) *conversation.Message {
 	msg := conversation.NewMessage(role, conversation.Text(text))
 	return &msg

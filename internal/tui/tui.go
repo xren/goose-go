@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	"goose-go/internal/models"
+	tuitheme "goose-go/internal/tui/theme"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"goose-go/internal/agent"
 	"goose-go/internal/app"
@@ -35,6 +35,7 @@ type Runtime interface {
 
 type Options struct {
 	SessionID string
+	Theme     string
 }
 
 type itemKind string
@@ -78,6 +79,12 @@ type sessionPickerState struct {
 	Err      string
 }
 
+type themePickerState struct {
+	Open     bool
+	Items    []tuitheme.Name
+	Selected int
+}
+
 type model struct {
 	ctx        context.Context
 	runtime    Runtime
@@ -98,6 +105,39 @@ type model struct {
 	approval   approvalViewState
 	picker     modelPickerState
 	sessions   sessionPickerState
+	themes     themePickerState
+	theme      tuitheme.Palette
+}
+
+func (m model) canScrollTranscript() bool {
+	return !m.sessions.Open && !m.picker.Open && !m.themes.Open && m.approval.Request == nil
+}
+
+func (m *model) handleViewportKey(msg tea.KeyMsg) bool {
+	if !m.canScrollTranscript() {
+		return false
+	}
+	switch msg.String() {
+	case "pgup", "ctrl+u":
+		m.viewport.HalfPageUp()
+		return true
+	case "pgdown":
+		m.viewport.HalfPageDown()
+		return true
+	case "home":
+		m.viewport.GotoTop()
+		return true
+	case "end":
+		m.viewport.GotoBottom()
+		return true
+	case "ctrl+f":
+		if m.running {
+			return false
+		}
+		m.viewport.HalfPageDown()
+		return true
+	}
+	return false
 }
 
 type modelsLoadedMsg struct{ items []models.Availability }
@@ -107,29 +147,18 @@ type modelSetFailedMsg struct{ err error }
 type sessionsLoadedMsg struct{ items []session.Summary }
 type sessionsLoadFailedMsg struct{ err error }
 
-var (
-	headerStyle        = lipgloss.NewStyle().Bold(true).Padding(0, 1)
-	statusStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(0, 1)
-	errorStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Padding(0, 1)
-	approvalPanelStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("220")).Padding(0, 1)
-	approvalTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("220"))
-	approvalErrorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	pickerPanelStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("69")).Padding(0, 1)
-	pickerTitleStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("69"))
-	pickerCursorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true)
-	pickerDimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	sessionPanelStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("111")).Padding(0, 1)
-	sessionTitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("111"))
-)
-
 func Run(ctx context.Context, in io.Reader, out io.Writer, runtime Runtime, opts Options) error {
 	m := newModel(ctx, runtime, opts)
-	p := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(out), tea.WithAltScreen())
+	p := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(out), tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err := p.Run()
 	return err
 }
 
 func newModel(ctx context.Context, runtime Runtime, opts Options) model {
+	palette, err := tuitheme.Resolve(opts.Theme)
+	if err != nil {
+		palette, _ = tuitheme.Resolve("")
+	}
 	input := textinput.New()
 	input.Placeholder = "Ask goose-go"
 	input.Focus()
@@ -138,6 +167,8 @@ func newModel(ctx context.Context, runtime Runtime, opts Options) model {
 
 	vp := viewport.New(0, 0)
 	vp.SetContent("")
+	vp.MouseWheelEnabled = true
+	vp.MouseWheelDelta = 4
 
 	return model{
 		ctx:        ctx,
@@ -148,6 +179,7 @@ func newModel(ctx context.Context, runtime Runtime, opts Options) model {
 		status:     "idle",
 		workingDir: runtime.WorkingDir(),
 		async:      make(chan tea.Msg, 128),
+		theme:      palette,
 	}
 }
 
@@ -165,6 +197,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.layout()
+		return m, nil
+	case tea.MouseMsg:
+		if m.canScrollTranscript() {
+			var cmd tea.Cmd
+			m.viewport, cmd = m.viewport.Update(msg)
+			return m, cmd
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.sessions.Open {
@@ -230,6 +269,47 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		if m.themes.Open {
+			switch msg.String() {
+			case "esc":
+				m.themes = themePickerState{}
+				m.status = "idle"
+				m.layout()
+				return m, nil
+			case "up", "k":
+				if m.themes.Selected > 0 {
+					m.themes.Selected--
+				}
+				return m, nil
+			case "down", "j":
+				if m.themes.Selected < len(m.themes.Items)-1 {
+					m.themes.Selected++
+				}
+				return m, nil
+			case "enter":
+				if len(m.themes.Items) == 0 {
+					return m, nil
+				}
+				selected := m.themes.Items[m.themes.Selected]
+				palette, err := tuitheme.Resolve(string(selected))
+				if err != nil {
+					m.status = "failed"
+					m.errorText = err.Error()
+					return m, nil
+				}
+				m.theme = palette
+				m.themes = themePickerState{}
+				m.status = "idle"
+				m.items = append(m.items,
+					transcriptItem{Kind: kindSystem, Prefix: "system", Text: "/theme"},
+					transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("selected theme: %s", palette.Name)},
+				)
+				m.layout()
+				m.syncViewport(true)
+				return m, nil
+			}
+		}
+
 		if m.approval.Request != nil {
 			switch msg.String() {
 			case "ctrl+c", "esc":
@@ -258,6 +338,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
+		case "pgup", "pgdown", "home", "end", "ctrl+u", "ctrl+f":
+			if m.handleViewportKey(msg) {
+				return m, nil
+			}
 		case "ctrl+r":
 			if m.running || m.approval.Request != nil || m.picker.Open {
 				return m, nil
@@ -278,7 +362,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter":
-			if m.running || m.approval.Request != nil || m.picker.Open {
+			if m.running || m.approval.Request != nil || m.picker.Open || m.themes.Open {
 				return m, nil
 			}
 			prompt := strings.TrimSpace(m.input.Value())
@@ -295,12 +379,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, loadModelsCmd(m.ctx, m.runtime)
 			}
 			if m.handleLocalCommand(prompt) {
-				m.syncViewport()
+				m.syncViewport(true)
 				return m, nil
 			}
 			m.status = "starting"
 			return m, startRunCmd(m.ctx, m.runtime, m.async, prompt, m.sessionID)
 		case "ctrl+d":
+			if m.handleViewportKey(msg) {
+				return m, nil
+			}
 			if !m.running {
 				return m, tea.Quit
 			}
@@ -343,7 +430,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 		m.picker = modelPickerState{}
 		m.status = "idle"
-		m.syncViewport()
+		m.layout()
+		m.syncViewport(true)
 		return m, nil
 	case modelSetFailedMsg:
 		m.picker.Busy = false
@@ -363,11 +451,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status = "idle"
 		}
-		m.syncViewport()
+		m.layout()
+		m.syncViewport(true)
 		return m, nil
 	case sessionLoadFailedMsg:
+		m.sessions = sessionPickerState{}
 		m.status = "failed"
 		m.errorText = msg.err.Error()
+		m.layout()
 		return m, nil
 	case runStartedMsg:
 		m.sessionID = msg.session.ID
@@ -377,7 +468,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.running = true
 		m.status = "running"
 		m.approval = approvalViewState{}
-		m.syncViewport()
+		m.layout()
+		m.syncViewport(true)
 		return m, nil
 	case runStartFailedMsg:
 		m.status = "failed"
@@ -389,7 +481,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.running = true
 		m.status = "running"
 		m.errorText = ""
-		m.syncViewport()
+		m.layout()
+		m.syncViewport(true)
 		return m, nil
 	case approvalStartFailedMsg:
 		m.running = false
@@ -414,75 +507,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		return m, waitForAsync(m.async)
 	}
-}
-
-func (m model) View() string {
-	header := headerStyle.Render(fmt.Sprintf("session: %s", fallback(m.sessionID, "new")))
-	cwd := statusStyle.Render(fmt.Sprintf("cwd: %s", fallback(m.workingDir, "-")))
-	status := statusStyle.Render(fmt.Sprintf("status: %s", m.status))
-	if m.errorText != "" {
-		status += "\n" + errorStyle.Render(m.errorText)
-	}
-	parts := []string{header, cwd, status, m.viewport.View()}
-	if panel := m.approvalPanel(); panel != "" {
-		parts = append(parts, panel)
-	}
-	if panel := m.sessionPickerPanel(); panel != "" {
-		parts = append(parts, panel)
-	}
-	if panel := m.modelPickerPanel(); panel != "" {
-		parts = append(parts, panel)
-	}
-	parts = append(parts, m.input.View(), statusStyle.Render(m.footerText()))
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
-}
-
-func (m *model) layout() {
-	if m.width <= 0 || m.height <= 0 {
-		return
-	}
-	headerLines := 3
-	footerLines := 2
-	composerLines := 1
-	approvalLines := 0
-	if m.approval.Request != nil {
-		approvalLines = 7
-		if m.approval.Err != "" {
-			approvalLines++
-		}
-	}
-	pickerLines := 0
-	if m.picker.Open {
-		pickerLines = len(m.picker.Items) + 3
-		if m.picker.Err != "" {
-			pickerLines++
-		}
-		if pickerLines < 6 {
-			pickerLines = 6
-		}
-	}
-	sessionLines := 0
-	if m.sessions.Open {
-		sessionLines = len(m.sessions.Items)*2 + 3
-		if m.sessions.Err != "" {
-			sessionLines++
-		}
-		if sessionLines < 6 {
-			sessionLines = 6
-		}
-	}
-	bodyHeight := m.height - headerLines - footerLines - composerLines - approvalLines - pickerLines - sessionLines
-	if bodyHeight < 3 {
-		bodyHeight = 3
-	}
-	m.viewport.Width = m.width
-	m.viewport.Height = bodyHeight
-	m.syncViewport()
-}
-
-func (m *model) syncViewport() {
-	m.viewport.SetContent(renderItems(m.items, m.viewport.Width))
-	m.viewport.GotoBottom()
 }
 
 func (m *model) applyAgentEvent(event agent.Event) {
@@ -551,7 +575,7 @@ func (m *model) applyAgentEvent(event agent.Event) {
 		m.finishRun("failed")
 	}
 	m.layout()
-	m.syncViewport()
+	m.syncViewport(false)
 }
 
 func (m *model) upsertLiveAssistant(delta string) {
