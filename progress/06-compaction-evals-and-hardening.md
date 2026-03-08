@@ -41,7 +41,7 @@ in_progress
 - [x] Add regression cases for streaming agent flows
 - [ ] Add architecture and boundary checks
 - [x] Add per-session structured logs and transcript artifacts for debugging
-- [ ] Add provider smoke coverage and diagnostics for Codex auth/cache failures
+- [x] Add provider smoke coverage and diagnostics for Codex auth/cache failures
 - [ ] Add repo hygiene checks for drift, duplication, or oversized files
 - [x] Promote smoke and eval commands into regular workflow
 
@@ -64,6 +64,7 @@ in_progress
 - `internal/app` now renders `goose-go run` from agent events directly, which makes the event stream a real integration seam instead of test-only infrastructure.
 - `internal/app` now records the same event stream into per-session JSONL traces for postmortem debugging and future eval assertions.
 - `make eval` now runs a deterministic scripted harness under `internal/evals` that asserts on trace/event outcomes for baseline runtime scenarios.
+- `provider-smoke` now maps low-level Codex/auth failures into a generic diagnostic model that can be reused by future providers.
 - Eval quality will depend on runtime legibility, not only on test count.
 - Runtime diagnostics must cover failures caused by shared external auth state, not only agent-loop logic.
 - Architecture docs should stay synchronized with the current runtime shape so fresh agents can start Milestone 06 without reconstructing the current system from code first.

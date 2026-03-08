@@ -177,6 +177,17 @@ The current `openaicodex` implementation is intentionally limited:
 
 These constraints are deliberate. They keep the first provider slice legible and testable.
 
+## Failure Handling
+
+This package still returns low-level transport and auth errors.
+
+User-facing normalization currently happens one layer up in `internal/app`:
+
+- `provider-smoke` maps low-level failures into stable diagnostic categories
+- debug mode appends the underlying cause for deeper inspection
+
+That keeps provider internals provider-specific while letting the CLI present a stable error model that can work for future providers too.
+
 ## Design Rules
 
 When changing this provider, keep these rules intact:

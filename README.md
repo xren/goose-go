@@ -84,6 +84,18 @@ To inspect the translated request, redacted headers, raw SSE events, and normali
 go run ./cmd/goose-go provider-smoke --debug
 ```
 
+`provider-smoke` now reports normalized failure categories such as:
+
+- `auth_missing`
+- `auth_invalid`
+- `auth_refresh_failed`
+- `provider_request_failed`
+- `provider_http_error`
+- `provider_stream_error`
+- `provider_empty_response`
+
+Use `--debug` when you need the low-level cause appended to the concise diagnostic.
+
 To run the first real agent loop from the CLI:
 
 ```sh

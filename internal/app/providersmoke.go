@@ -37,7 +37,7 @@ func RunProviderSmoke(ctx context.Context, out io.Writer, prompt string, opts Pr
 
 	p, err := newSmokeProvider(debugOut)
 	if err != nil {
-		return fmt.Errorf("create openai-codex provider: %w", err)
+		return diagnoseProviderError("openai-codex", fmt.Errorf("create openai-codex provider: %w", err), opts.Debug)
 	}
 
 	stream, err := p.Stream(ctx, provider.Request{
@@ -51,7 +51,7 @@ func RunProviderSmoke(ctx context.Context, out io.Writer, prompt string, opts Pr
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("start provider smoke request: %w", err)
+		return diagnoseProviderError("openai-codex", fmt.Errorf("start provider smoke request: %w", err), opts.Debug)
 	}
 
 	var sawDone bool
@@ -68,7 +68,7 @@ func RunProviderSmoke(ctx context.Context, out io.Writer, prompt string, opts Pr
 		case provider.EventTypeDone:
 			sawDone = true
 		case provider.EventTypeError:
-			return fmt.Errorf("provider smoke failed: %w", event.Err)
+			return diagnoseProviderError("openai-codex", fmt.Errorf("provider smoke failed: %w", event.Err), opts.Debug)
 		}
 	}
 
@@ -77,7 +77,7 @@ func RunProviderSmoke(ctx context.Context, out io.Writer, prompt string, opts Pr
 	}
 
 	if !sawMessage || !sawDone {
-		return errors.New("provider smoke did not produce a complete response")
+		return diagnoseProviderError("openai-codex", errors.New("provider smoke did not produce a complete response"), opts.Debug)
 	}
 
 	return nil
