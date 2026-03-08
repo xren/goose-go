@@ -39,6 +39,7 @@ type RunOptions struct {
 	WorkingDir    string
 	DBPath        string
 	MaxTurns      int
+	SessionID     string
 }
 
 var newRunProvider = func(debugOut io.Writer) (provider.Provider, error) {
@@ -90,13 +91,9 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 		return fmt.Errorf("register shell tool: %w", err)
 	}
 
-	record, err := store.CreateSession(ctx, session.CreateParams{
-		Name:       sessionName(prompt),
-		WorkingDir: workingDir,
-		Type:       session.TypeTerminal,
-	})
+	record, startIndex, err := loadOrCreateSession(ctx, store, prompt, workingDir, opts.SessionID)
 	if err != nil {
-		return fmt.Errorf("create session: %w", err)
+		return err
 	}
 
 	approvalMode := agent.ApprovalModeAuto
@@ -127,7 +124,7 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 	if _, werr := fmt.Fprintf(out, "session: %s\n", result.Session.ID); werr != nil {
 		return fmt.Errorf("write session header: %w", werr)
 	}
-	if rerr := renderConversation(out, result.Session.Conversation); rerr != nil {
+	if rerr := renderConversationFrom(out, result.Session.Conversation, startIndex); rerr != nil {
 		return rerr
 	}
 
@@ -136,6 +133,40 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 	}
 	if result.Status == agent.StatusAwaitingApproval {
 		return errors.New("agent is awaiting approval")
+	}
+	return nil
+}
+
+func ListSessions(ctx context.Context, out io.Writer, opts RunOptions) error {
+	workingDir, err := resolveWorkingDir(opts.WorkingDir)
+	if err != nil {
+		return err
+	}
+
+	dbPath := opts.DBPath
+	if dbPath == "" {
+		dbPath = filepath.Join(workingDir, defaultRunDBDir, defaultRunDBName)
+	}
+
+	store, err := openRunStore(dbPath)
+	if err != nil {
+		return fmt.Errorf("open session store: %w", err)
+	}
+	defer func() { _ = store.Close() }()
+
+	sessions, err := store.ListSessions(ctx)
+	if err != nil {
+		return err
+	}
+	if len(sessions) == 0 {
+		_, err := io.WriteString(out, "no sessions\n")
+		return err
+	}
+
+	for _, item := range sessions {
+		if _, err := fmt.Fprintf(out, "%s\t%s\t%s\t%d\n", item.ID, item.Name, item.WorkingDir, item.MessageCount); err != nil {
+			return fmt.Errorf("write session list: %w", err)
+		}
 	}
 	return nil
 }
@@ -167,7 +198,13 @@ func (a interactiveApprover) Decide(_ context.Context, req agent.ApprovalRequest
 	return agent.ApprovalDecisionDeny, nil
 }
 
-func renderConversation(out io.Writer, conv conversation.Conversation) error {
+func renderConversationFrom(out io.Writer, conv conversation.Conversation, startIndex int) error {
+	if startIndex < 0 {
+		startIndex = 0
+	}
+	if startIndex > len(conv.Messages) {
+		startIndex = len(conv.Messages)
+	}
 	toolNames := map[string]string{}
 	for _, message := range conv.Messages {
 		for _, content := range message.Content {
@@ -177,7 +214,7 @@ func renderConversation(out io.Writer, conv conversation.Conversation) error {
 		}
 	}
 
-	for _, message := range conv.Messages {
+	for _, message := range conv.Messages[startIndex:] {
 		switch message.Role {
 		case conversation.RoleUser:
 			if err := renderTextBlocks(out, "user", message.Content); err != nil {
@@ -226,6 +263,26 @@ func renderTextBlocks(out io.Writer, prefix string, content []conversation.Conte
 		}
 	}
 	return nil
+}
+
+func loadOrCreateSession(ctx context.Context, store session.Store, prompt string, workingDir string, sessionID string) (session.Session, int, error) {
+	if sessionID == "" {
+		record, err := store.CreateSession(ctx, session.CreateParams{
+			Name:       sessionName(prompt),
+			WorkingDir: workingDir,
+			Type:       session.TypeTerminal,
+		})
+		if err != nil {
+			return session.Session{}, 0, fmt.Errorf("create session: %w", err)
+		}
+		return record, 0, nil
+	}
+
+	record, err := store.GetSession(ctx, sessionID)
+	if err != nil {
+		return session.Session{}, 0, fmt.Errorf("load session %s: %w", sessionID, err)
+	}
+	return record, len(record.Conversation.Messages), nil
 }
 
 func resolveWorkingDir(workingDir string) (string, error) {

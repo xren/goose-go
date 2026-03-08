@@ -31,9 +31,20 @@ type CreateParams struct {
 	Type       Type
 }
 
+type Summary struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	WorkingDir   string `json:"working_dir"`
+	Type         Type   `json:"type"`
+	CreatedAt    int64  `json:"created_at"`
+	UpdatedAt    int64  `json:"updated_at"`
+	MessageCount int    `json:"message_count"`
+}
+
 type Store interface {
 	CreateSession(ctx context.Context, params CreateParams) (Session, error)
 	GetSession(ctx context.Context, id string) (Session, error)
+	ListSessions(ctx context.Context) ([]Summary, error)
 	AddMessage(ctx context.Context, sessionID string, message conversation.Message) (Session, error)
 	ReplaceConversation(ctx context.Context, sessionID string, conv conversation.Conversation) (Session, error)
 	ReplayConversation(ctx context.Context, sessionID string) (conversation.Conversation, error)

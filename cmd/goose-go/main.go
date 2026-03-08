@@ -28,6 +28,7 @@ func run(args []string) error {
 		fs.SetOutput(os.Stderr)
 		approve := fs.Bool("approve", false, "prompt before each tool execution")
 		debugProvider := fs.Bool("debug-provider", false, "print translated provider request and raw SSE events")
+		sessionID := fs.String("session", "", "resume an existing session by id")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
@@ -37,7 +38,17 @@ func run(args []string) error {
 		return app.RunAgent(ctx, os.Stdin, os.Stdout, prompt, app.RunOptions{
 			Approve:       *approve,
 			DebugProvider: *debugProvider,
+			SessionID:     *sessionID,
 		})
+	case "sessions":
+		fs := flag.NewFlagSet("sessions", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		ctx, cancel := app.RunAgentContext()
+		defer cancel()
+		return app.ListSessions(ctx, os.Stdout, app.RunOptions{})
 	case "provider-smoke":
 		fs := flag.NewFlagSet("provider-smoke", flag.ContinueOnError)
 		fs.SetOutput(os.Stderr)

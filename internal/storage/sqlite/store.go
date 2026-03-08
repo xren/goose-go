@@ -123,6 +123,40 @@ func (s *Store) GetSession(ctx context.Context, id string) (session.Session, err
 	return getSession(ctx, s.db, id)
 }
 
+func (s *Store) ListSessions(ctx context.Context) ([]session.Summary, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT id, name, working_dir, type, created_at, updated_at, message_count
+		 FROM sessions
+		 ORDER BY updated_at DESC`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list sessions: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var summaries []session.Summary
+	for rows.Next() {
+		var item session.Summary
+		if err := rows.Scan(
+			&item.ID,
+			&item.Name,
+			&item.WorkingDir,
+			&item.Type,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+			&item.MessageCount,
+		); err != nil {
+			return nil, fmt.Errorf("scan session summary: %w", err)
+		}
+		summaries = append(summaries, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate session summaries: %w", err)
+	}
+	return summaries, nil
+}
+
 func (s *Store) AddMessage(ctx context.Context, sessionID string, message conversation.Message) (session.Session, error) {
 	if err := message.Validate(); err != nil {
 		return session.Session{}, err
