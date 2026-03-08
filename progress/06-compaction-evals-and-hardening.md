@@ -1,8 +1,8 @@
-# 06 Compaction Evals and Hardening
+# 06 Agent Event Stream Evals and Hardening
 
 ## Objective
 
-Add the first hardening pass once the terminal core works end to end.
+Refactor the runtime to emit structured live events that both the CLI and a future TUI can consume, while adding observability, evals, and hardening around that event-driven runtime.
 
 ## Status
 
@@ -15,6 +15,8 @@ planned
 
 ## Scope In
 
+- structured agent event stream
+- thin blocking wrappers over the streaming runtime
 - context compaction
 - eval harness
 - smoke task expansion
@@ -26,13 +28,17 @@ planned
 
 ## Scope Out
 
+- full interactive TUI
 - large product-surface expansions
 
 ## Checklist
 
-- [ ] Add compaction logic
+- [ ] Refactor `internal/agent` to emit structured live events
+- [ ] Keep blocking reply and CLI wrappers as thin adapters over the streaming runtime
+- [ ] Define a stable event taxonomy for turns, assistant deltas, tool lifecycle, approvals, and termination
+- [ ] Add context compaction logic
 - [ ] Add task eval runner
-- [ ] Add regression cases for terminal-core flows
+- [ ] Add regression cases for streaming agent flows
 - [ ] Add architecture and boundary checks
 - [ ] Add per-session structured logs and transcript artifacts for debugging
 - [ ] Add provider smoke coverage and diagnostics for Codex auth/cache failures
@@ -41,15 +47,18 @@ planned
 
 ## Acceptance Criteria
 
+- The runtime emits structured events that a CLI or TUI can subscribe to without reading SQLite directly.
 - The repo can catch regressions in terminal-core behavior through repeatable smoke and eval runs.
 - Agent runs and provider failures produce enough artifacts to debug failures without reconstructing state from memory.
 
 ## Open Questions
 
-- None yet.
+- What is the smallest event set that can support both transcript rendering and future approval UI without churn.
 
 ## Notes / Findings
 
-- Hardening starts only after a working terminal-core loop exists.
+- TUI work should subscribe to agent events rather than drive provider, tool, or session logic directly.
+- This milestone exists to avoid coupling future UI work to the current blocking `agent.Reply()` path.
+- Event streaming should become the source of truth for live rendering; SQLite remains the persistence layer, not the live UI transport.
 - Eval quality will depend on runtime legibility, not only on test count.
 - Runtime diagnostics must cover failures caused by shared external auth state, not only agent-loop logic.

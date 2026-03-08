@@ -2,11 +2,11 @@
 
 ## Objective
 
-Build `goose-go` as a Go implementation of Goose terminal core: a local agent runtime with structured sessions, a provider boundary, developer tools, approvals, and an end-to-end CLI loop.
+Build `goose-go` as a Go implementation of Goose terminal core: a local agent runtime with structured sessions, a provider boundary, developer tools, approvals, and an end-to-end CLI loop that can later support a proper interactive TUI.
 
 ## Current V1 Target
 
-Terminal core only. No server or desktop parity in v1. The first provider slice is Codex-first and reuses an existing `codex login`.
+Terminal core first. No server or desktop parity in v1. The first provider slice is Codex-first and reuses an existing `codex login`. A minimal TUI is planned only after CLI/session ergonomics and a live agent event stream exist.
 
 ## Milestones
 
@@ -17,28 +17,25 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 | 02 | Provider foundation and Codex-first OpenAI provider | done | 01 | Existing `codex login` user can complete streaming chat without an API key | 2026-03-08 |
 | 03 | Tool runtime and developer tools | done | 01, 02 | The runtime can list and execute the initial `shell` tool | 2026-03-08 |
 | 04 | Agent loop and approvals | done | 02, 03 | Multi-turn tool-using loop works with approvals | 2026-03-08 |
-| 05 | CLI and session flow | in_progress | 04 | Terminal session can start, interrupt, resume, and render output | 2026-03-08 |
-| 06 | Compaction, evals, and hardening | planned | 04, 05 | Eval harness catches terminal-core regressions | 2026-03-08 |
+| 05 | CLI and session flow | in_progress | 04 | Terminal session can start, inspect, resume, and interrupt cleanly | 2026-03-08 |
+| 06 | Agent event stream, evals, and hardening | planned | 04, 05 | Runtime emits structured events and eval harness catches regressions | 2026-03-08 |
+| 07 | Interactive TUI | planned | 05, 06 | TUI can drive sessions through event stream without owning runtime logic | 2026-03-08 |
 | 99 | Later parity backlog | planned | none | Deferred work is tracked outside v1 milestones | 2026-03-08 |
 
 ## Current Focus
 
-- Start Milestone 05.
-- Make the architecture executable before provider and agent code grow.
-- Use `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
-- The first concrete provider is now documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.
-- The SQLite backend now lives under `internal/storage/sqlite`; the next work is provider and auth foundation on top of that split.
-- The provider interface, model config, usage metadata, architecture check, Codex auth/cache reader, and the first `openai-codex` provider now exist.
-- `cmd/goose-go provider-smoke` now exists as the minimal runtime proof path for the provider slice.
-- `cmd/goose-go provider-smoke --debug` now exposes the translated request, redacted headers, raw SSE events, and normalized provider events for inspection.
-- The real smoke path has been exercised successfully against local Codex auth and now documents the observed event sequence.
-- The tool contract, registry, and first in-process `shell` tool now exist.
-- The tools runtime is now documented in `internal/tools/ARCHITECTURE.md` so fresh agents can pick up the tool execution model without prior chat context.
-- `internal/agent` now provides the first multi-turn runtime loop over the provider, session store, and `shell` tool.
-- The agent runtime is now documented in `internal/agent/ARCHITECTURE.md` so fresh agents can pick up the control flow without prior chat context.
+- Finish Milestone 05.
+- Add a `sessions` command and `run --session <id>` so persisted sessions become usable from the CLI.
+- Add clean interrupt handling so the CLI can cancel provider and tool work without corrupting session state.
+- Keep `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
+- The first concrete provider is documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.
+- The tools runtime is documented in `internal/tools/ARCHITECTURE.md` so fresh agents can pick up the tool execution model without prior chat context.
+- The agent runtime is documented in `internal/agent/ARCHITECTURE.md` so fresh agents can pick up the control flow without prior chat context.
 - `cmd/goose-go run` now exposes the agent runtime through a minimal CLI session path.
 - The Codex provider replay path now preserves function-call item IDs separately from call IDs, which fixes multi-turn CLI runs after tool use.
-- The next work is adding interrupt handling and resume on top of that command shape.
+- After Milestone 05, refactor `internal/agent` around a live event stream before building any substantial TUI.
+- The future TUI must subscribe to agent events; it must not be built directly on the current blocking `agent.Reply()` path.
+- The future TUI must not use SQLite as its primary live UI transport.
 - Keep native `goose-go` login out of the first slice.
 - Keep the `goose/` submodule as reference-only material.
 
@@ -55,5 +52,6 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 - Shared Codex auth cache refresh now exists, but it still depends on the current file-backed cache shape and not keyring-backed credentials.
 - The current provider implementation is intentionally narrow: SSE only, no websocket transport, and no broader Responses surface yet.
 - Generic OpenAI API-key provider support is deferred until after the Codex-first slice is stable.
-
-- Structured file tools beyond `shell` are now deferred; if the agent loop becomes too opaque or too permissive with shell-only execution, that scope cut may need to be revisited.
+- Structured file tools beyond `shell` are deferred; if the agent loop becomes too opaque or too permissive with shell-only execution, that scope cut may need to be revisited.
+- If we build the TUI on top of the current blocking transcript-after-completion path, we will likely rewrite it once event streaming lands.
+- The runtime still lacks a stable event taxonomy for turns, assistant deltas, tool lifecycle, approvals, and termination.
