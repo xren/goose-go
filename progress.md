@@ -12,9 +12,9 @@ Terminal core only. No server or desktop parity in v1.
 
 | Milestone | Goal | Status | Dependencies | Acceptance | Last Updated |
 | --- | --- | --- | --- | --- | --- |
-| 00 | Root setup, docs, and progress structure | in_progress | none | Repo is the system of record and workflow targets are defined | 2026-03-08 |
-| 01 | Domain model and storage | planned | 00 | Structured sessions can be created, loaded, and replayed | 2026-03-08 |
-| 02 | OpenAI-compatible provider | planned | 01 | One provider supports streaming chat without tools | 2026-03-08 |
+| 00 | Root setup, docs, and progress structure | done | none | Repo is the system of record and workflow targets are defined | 2026-03-08 |
+| 01 | Domain model and storage | done | 00 | Structured sessions can be created, loaded, and replayed | 2026-03-08 |
+| 02 | OpenAI-compatible provider | in_progress | 01 | One provider supports streaming chat without tools | 2026-03-08 |
 | 03 | Tool runtime and developer tools | planned | 01, 02 | In-process tools can be listed and executed | 2026-03-08 |
 | 04 | Agent loop and approvals | planned | 02, 03 | Multi-turn tool-using loop works with approvals | 2026-03-08 |
 | 05 | CLI and session flow | planned | 04 | Terminal session can start, interrupt, resume, and render output | 2026-03-08 |
@@ -23,8 +23,9 @@ Terminal core only. No server or desktop parity in v1.
 
 ## Current Focus
 
-- Finish Milestone 00.
-- Establish root docs before creating runtime packages.
+- Start Milestone 02.
+- Define the provider interface around the new conversation and session model.
+- Implement one OpenAI-compatible provider with streaming support.
 - Keep the `goose/` submodule as reference-only material.
 
 ## Blocked / Risks
@@ -32,3 +33,5 @@ Terminal core only. No server or desktop parity in v1.
 - The module path is still local (`goose-go`) and will need a real import path later.
 - Upstream Goose has broader product surface area than this repo should target in v1.
 - If root docs drift from implementation, agents will start making incorrect assumptions.
+- `make eval` is intentionally a stub in Milestone 00 and does not represent a working harness yet.
+- The first persistence backend is SQLite with JSON-encoded conversations; if that shape changes later, migration work will be needed.

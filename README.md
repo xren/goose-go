@@ -67,4 +67,10 @@ make eval
 
 ## Current State
 
-This repo is still in the root-setup milestone. The Go runtime packages are not implemented yet. The root docs and progress files are the source of truth for what gets built next.
+The repo now has the first runtime foundation in place:
+
+- root docs and progress tracking are set up
+- structured conversation types exist
+- a SQLite-backed session store exists with tests for create, load, append, replace, and replay
+
+The next milestone is the first provider implementation.

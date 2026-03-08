@@ -6,7 +6,7 @@ Define the structured runtime model and persistence layer before provider or too
 
 ## Status
 
-planned
+done
 
 ## Dependencies
 
@@ -27,11 +27,11 @@ planned
 
 ## Checklist
 
-- [ ] Define core message and conversation types
-- [ ] Define session metadata and replay requirements
-- [ ] Choose and implement persistence backend
-- [ ] Support create, load, append, replace, and replay
-- [ ] Add storage-focused tests
+- [x] Define core message and conversation types
+- [x] Define session metadata and replay requirements
+- [x] Choose and implement persistence backend
+- [x] Support create, load, append, replace, and replay
+- [x] Add storage-focused tests
 
 ## Acceptance Criteria
 
@@ -39,8 +39,10 @@ planned
 
 ## Open Questions
 
-- None yet.
+- How much of Goose's richer message surface should be modeled before provider/tool milestones require it.
 
 ## Notes / Findings
 
 - Storage should preserve tool requests and tool results as first-class conversation data.
+- The first backend is SQLite, with the conversation stored as validated JSON in the session row.
+- The initial `internal/session.Store` interface is narrow on purpose: create, load, append, replace, and replay.

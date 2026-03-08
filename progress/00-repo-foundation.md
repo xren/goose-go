@@ -6,7 +6,7 @@ Turn the repo root into the system of record for humans and agents before runtim
 
 ## Status
 
-in_progress
+done
 
 ## Dependencies
 
@@ -30,13 +30,15 @@ none
 
 ## Checklist
 
-- [ ] Replace bootstrap README with project README
-- [ ] Add root AGENTS navigation file
-- [ ] Add architecture, invariants, Goose reference, and eval docs
-- [ ] Add progress rollup
-- [ ] Add milestone files under `/progress`
-- [ ] Add `check`, `smoke`, and `eval` targets to the root Makefile
-- [ ] Verify `make run`, `make test`, `make lint`, and `make check`
+- [x] Replace bootstrap README with project README
+- [x] Add root AGENTS navigation file
+- [x] Add architecture, invariants, Goose reference, and eval docs
+- [x] Add progress rollup
+- [x] Add milestone files under `/progress`
+- [x] Add `check`, `smoke`, and `eval` targets to the root Makefile
+- [x] Verify `make run`, `make test`, `make lint`, and `make check`
+- [x] Verify `make smoke`
+- [x] Verify `make eval` fails with the intended placeholder message
 
 ## Acceptance Criteria
 
@@ -51,3 +53,4 @@ none
 ## Notes / Findings
 
 - `goose/` remains read-only reference material.
+- `make eval` exists as a stable entrypoint but intentionally exits with a placeholder failure until the harness is implemented.
