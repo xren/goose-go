@@ -72,7 +72,8 @@ This reflects the current system shape:
 - `internal/agent` is the runtime control plane.
 - `session.Store` is the persistence seam used by both app and agent.
 - provider, tools, auth, and storage stay behind their package boundaries.
-- the next architecture step is a live agent event stream that both CLI and future TUI layers can consume.
+- `internal/agent` now owns a live event stream that both CLI and future TUI layers can consume.
+- the next architecture step is to make CLI rendering subscribe to that stream directly instead of printing only after completion.
 
 ## Concrete Subsystem Docs
 

@@ -25,6 +25,7 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 ## Current Focus
 
 - Start Milestone 06.
+- `internal/agent` now exposes a live event stream through `ReplyStream`, and `Reply` is now a wrapper over that streaming runtime.
 - `cmd/goose-go sessions` now exposes stored sessions from the session store abstraction.
 - `cmd/goose-go run --session <id>` now resumes an existing session and prints only the new transcript segment.
 - `cmd/goose-go run` now cancels cleanly on `SIGINT` and renders the persisted transcript instead of a raw context error.
@@ -37,6 +38,7 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - The root, agent, and session architecture diagrams are updated to reflect the current CLI/session surface and the Milestone 06 event-stream direction.
 - `cmd/goose-go run` now exposes the agent runtime through a minimal CLI session path.
 - The Codex provider replay path now preserves function-call item IDs separately from call IDs, which fixes multi-turn CLI runs after tool use.
+- Tool execution now defaults to the persisted session working directory when the model omits `working_dir`, which keeps resumed and cross-repo runs scoped to the right workspace.
 - After Milestone 05, refactor `internal/agent` around a live event stream before building any substantial TUI.
 - The future TUI must subscribe to agent events; it must not be built directly on the current blocking `agent.Reply()` path.
 - The future TUI must not use SQLite as its primary live UI transport.

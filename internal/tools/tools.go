@@ -22,9 +22,10 @@ type Definition struct {
 }
 
 type Call struct {
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments,omitempty"`
+	ID                string          `json:"id"`
+	Name              string          `json:"name"`
+	Arguments         json.RawMessage `json:"arguments,omitempty"`
+	DefaultWorkingDir string          `json:"-"`
 }
 
 type Result struct {

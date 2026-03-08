@@ -95,26 +95,71 @@ func New(store session.Store, p provider.Provider, registry *tools.Registry, con
 }
 
 func (a *Agent) Reply(ctx context.Context, sessionID string, userText string) (Result, error) {
+	stream, err := a.ReplyStream(ctx, sessionID, userText)
+	if err != nil {
+		return Result{}, err
+	}
+
+	var (
+		result  Result
+		runErr  error
+		haveEnd bool
+	)
+	for event := range stream {
+		switch event.Type {
+		case EventTypeRunCompleted:
+			haveEnd = true
+			if event.Result != nil {
+				result = *event.Result
+			}
+		case EventTypeRunInterrupted:
+			haveEnd = true
+			runErr = context.Canceled
+			if event.Result != nil {
+				result = *event.Result
+			}
+		case EventTypeRunFailed:
+			haveEnd = true
+			runErr = event.Err
+			if event.Result != nil {
+				result = *event.Result
+			}
+		}
+	}
+	if !haveEnd {
+		return Result{}, errors.New("agent stream ended without terminal event")
+	}
+	return result, runErr
+}
+
+func (a *Agent) reply(ctx context.Context, sessionID string, userText string, emit func(Event)) (Result, error) {
 	if userText == "" {
 		return Result{}, errors.New("user text is required")
 	}
+
+	emit(Event{Type: EventTypeRunStarted, SessionID: sessionID})
 
 	userMessage := conversation.NewMessage(conversation.RoleUser, conversation.Text(userText))
 	record, err := a.store.AddMessage(ctx, sessionID, userMessage)
 	if err != nil {
 		return Result{}, fmt.Errorf("append user message: %w", err)
 	}
+	emit(Event{Type: EventTypeUserMessagePersisted, SessionID: sessionID, Message: &userMessage})
 
 	for turn := 1; turn <= a.config.MaxTurns; turn++ {
-		assistantMessage, err := a.runProviderTurn(ctx, record)
+		emit(Event{Type: EventTypeTurnStarted, SessionID: sessionID, Turn: turn})
+
+		assistantMessage, err := a.runProviderTurn(ctx, record, turn, emit)
 		if err != nil {
 			return Result{}, err
 		}
+		emit(Event{Type: EventTypeAssistantMessageComplete, SessionID: sessionID, Turn: turn, Message: &assistantMessage})
 
 		record, err = a.store.AddMessage(ctx, sessionID, assistantMessage)
 		if err != nil {
 			return Result{}, fmt.Errorf("append assistant message: %w", err)
 		}
+		emit(Event{Type: EventTypeAssistantMessagePersisted, SessionID: sessionID, Turn: turn, Message: &assistantMessage})
 
 		toolCalls := extractToolCalls(assistantMessage)
 		if len(toolCalls) == 0 {
@@ -122,15 +167,20 @@ func (a *Agent) Reply(ctx context.Context, sessionID string, userText string) (R
 		}
 
 		for _, toolCall := range toolCalls {
+			call := toolCall
+			emit(Event{Type: EventTypeToolCallDetected, SessionID: sessionID, Turn: turn, ToolCall: &call})
+
 			decision, pending, err := a.approvalDecision(ctx, sessionID, toolCall)
 			if err != nil {
 				return Result{}, err
 			}
 			if pending != nil {
+				emit(Event{Type: EventTypeApprovalRequired, SessionID: sessionID, Turn: turn, ApprovalRequest: &ApprovalRequest{SessionID: sessionID, ToolCall: *pending}})
 				return Result{Status: StatusAwaitingApproval, Session: record, Turns: turn, PendingApprovalFor: pending}, nil
 			}
+			emit(Event{Type: EventTypeApprovalResolved, SessionID: sessionID, Turn: turn, ApprovalDecision: decision, ApprovalRequest: &ApprovalRequest{SessionID: sessionID, ToolCall: toolCall}})
 
-			result, err := a.executeTool(ctx, toolCall, decision)
+			result, err := a.executeTool(ctx, record, toolCall, decision, turn, emit)
 			if err != nil {
 				return Result{}, err
 			}
@@ -140,13 +190,14 @@ func (a *Agent) Reply(ctx context.Context, sessionID string, userText string) (R
 			if err != nil {
 				return Result{}, fmt.Errorf("append tool response: %w", err)
 			}
+			emit(Event{Type: EventTypeToolMessagePersisted, SessionID: sessionID, Turn: turn, Message: &toolMessage, ToolResult: &result})
 		}
 	}
 
 	return Result{Status: StatusCompleted, Session: record, Turns: a.config.MaxTurns}, ErrMaxTurnsExceeded
 }
 
-func (a *Agent) runProviderTurn(ctx context.Context, record session.Session) (conversation.Message, error) {
+func (a *Agent) runProviderTurn(ctx context.Context, record session.Session, turn int, emit func(Event)) (conversation.Message, error) {
 	stream, err := a.provider.Stream(ctx, provider.Request{
 		SessionID:    record.ID,
 		SystemPrompt: a.config.SystemPrompt,
@@ -161,6 +212,8 @@ func (a *Agent) runProviderTurn(ctx context.Context, record session.Session) (co
 	var finalMessage *conversation.Message
 	for event := range stream {
 		switch event.Type {
+		case provider.EventTypeTextDelta:
+			emit(Event{Type: EventTypeProviderTextDelta, SessionID: record.ID, Turn: turn, Delta: event.Delta})
 		case provider.EventTypeMessageComplete:
 			finalMessage = event.Message
 		case provider.EventTypeError:
@@ -197,17 +250,30 @@ func (a *Agent) approvalDecision(ctx context.Context, sessionID string, call too
 	}
 }
 
-func (a *Agent) executeTool(ctx context.Context, call tools.Call, decision ApprovalDecision) (tools.Result, error) {
+func (a *Agent) executeTool(ctx context.Context, record session.Session, call tools.Call, decision ApprovalDecision, turn int, emit func(Event)) (tools.Result, error) {
 	if decision == ApprovalDecisionDeny {
 		return deniedToolResult(call), nil
 	}
 
+	if call.DefaultWorkingDir == "" {
+		call.DefaultWorkingDir = record.WorkingDir
+	}
+
+	callCopy := call
+	emit(Event{Type: EventTypeToolExecutionStarted, SessionID: record.ID, Turn: turn, ToolCall: &callCopy})
+
 	result, err := a.tools.Execute(ctx, call)
 	if err == nil {
+		emit(Event{Type: EventTypeToolExecutionFinished, SessionID: record.ID, Turn: turn, ToolCall: &callCopy, ToolResult: &result})
 		return result, nil
 	}
 
-	return errorToolResult(call, err)
+	result, wrapErr := errorToolResult(call, err)
+	if wrapErr != nil {
+		return tools.Result{}, wrapErr
+	}
+	emit(Event{Type: EventTypeToolExecutionFinished, SessionID: record.ID, Turn: turn, ToolCall: &callCopy, ToolResult: &result})
+	return result, nil
 }
 
 func (c Config) validate() error {

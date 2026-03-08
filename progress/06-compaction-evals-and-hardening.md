@@ -33,9 +33,9 @@ in_progress
 
 ## Checklist
 
-- [ ] Refactor `internal/agent` to emit structured live events
-- [ ] Keep blocking reply and CLI wrappers as thin adapters over the streaming runtime
-- [ ] Define a stable event taxonomy for turns, assistant deltas, tool lifecycle, approvals, and termination
+- [x] Refactor `internal/agent` to emit structured live events
+- [x] Keep blocking reply and CLI wrappers as thin adapters over the streaming runtime
+- [x] Define a stable event taxonomy for turns, assistant deltas, tool lifecycle, approvals, and termination
 - [ ] Add context compaction logic
 - [ ] Add task eval runner
 - [ ] Add regression cases for streaming agent flows
@@ -60,6 +60,7 @@ in_progress
 - TUI work should subscribe to agent events rather than drive provider, tool, or session logic directly.
 - This milestone exists to avoid coupling future UI work to the current blocking `agent.Reply()` path.
 - Event streaming should become the source of truth for live rendering; SQLite remains the persistence layer, not the live UI transport.
+- `internal/agent` now exposes `ReplyStream`, and `Reply` consumes that stream as a compatibility wrapper.
 - Eval quality will depend on runtime legibility, not only on test count.
 - Runtime diagnostics must cover failures caused by shared external auth state, not only agent-loop logic.
 - Architecture docs should stay synchronized with the current runtime shape so fresh agents can start Milestone 06 without reconstructing the current system from code first.

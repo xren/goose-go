@@ -50,7 +50,7 @@ flowchart LR
 - `Definition`
   The tool name, description, and JSON schema-like input metadata exposed to the runtime and later to the provider layer.
 - `Call`
-  The normalized invocation shape. It carries the tool name and raw JSON arguments.
+  The normalized invocation shape. It carries the tool name, raw JSON arguments, and runtime execution defaults such as the session working directory.
 - `Result`
   The normalized output shape. It carries structured data plus a conversion path back into conversation content.
 - `Registry`
@@ -65,6 +65,7 @@ It intentionally stays narrow:
 - local execution only
 - synchronous execution
 - `/bin/sh -lc` command dispatch
+- default execution in the session working directory when the model does not provide `working_dir`
 - structured result with stdout, stderr, exit code, and error state
 
 This establishes the result shape and execution path for later tools such as `write`, `edit`, and `tree`.

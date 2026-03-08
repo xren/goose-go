@@ -48,3 +48,4 @@ done
 - The agent runtime is now documented in package-local form at `internal/agent/ARCHITECTURE.md` so fresh agents can understand the control flow before reading implementation details.
 - `internal/agent` now owns provider orchestration, tool dispatch, approval handling, and conversation persistence.
 - Tool responses are persisted as `tool` role messages so the provider can reconstruct function-call output on the next turn.
+- Tool execution now receives runtime defaults from the session context, including the default working directory for shell execution.

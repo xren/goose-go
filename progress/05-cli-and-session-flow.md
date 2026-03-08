@@ -53,4 +53,5 @@ done
 - The current `run` command is still transcript-after-completion, not a live event-driven UI.
 - `goose-go sessions` now lists stored sessions, and `goose-go run --session <id>` resumes an existing session while printing only the new transcript segment.
 - `cmd/goose-go run` now handles `SIGINT` by canceling the active run context and rendering the persisted transcript instead of dumping a raw context error.
+- Shell tool execution now defaults to the persisted session working directory when the model omits `working_dir`, so resumed sessions keep operating on the right workspace.
 - The next milestone must add a live agent event stream before substantial TUI work begins.

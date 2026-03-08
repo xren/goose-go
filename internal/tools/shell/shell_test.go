@@ -79,6 +79,56 @@ func TestShellRunWorkingDir(t *testing.T) {
 	}
 }
 
+func TestShellRunUsesDefaultWorkingDirWhenArgumentMissing(t *testing.T) {
+	tool := New()
+	dir := t.TempDir()
+
+	result, err := tool.Run(context.Background(), tools.Call{
+		ID:                "call_1",
+		Name:              "shell",
+		DefaultWorkingDir: dir,
+		Arguments:         json.RawMessage(`{"command":"pwd"}`),
+	})
+	if err != nil {
+		t.Fatalf("run shell: %v", err)
+	}
+
+	if got := strings.TrimSpace(result.Content[0].Text); filepath.Clean(got) != dir {
+		t.Fatalf("expected default working dir %q, got %q", dir, got)
+	}
+
+	var structured StructuredResult
+	if err := json.Unmarshal(result.Structured, &structured); err != nil {
+		t.Fatalf("decode structured result: %v", err)
+	}
+	if structured.WorkingDir != dir {
+		t.Fatalf("expected structured working dir %q, got %q", dir, structured.WorkingDir)
+	}
+}
+
+func TestShellRunExplicitWorkingDirOverridesDefault(t *testing.T) {
+	tool := New()
+	defaultDir := t.TempDir()
+	explicitDir := t.TempDir()
+
+	result, err := tool.Run(context.Background(), tools.Call{
+		ID:                "call_1",
+		Name:              "shell",
+		DefaultWorkingDir: defaultDir,
+		Arguments: mustJSON(t, Arguments{
+			Command:    "pwd",
+			WorkingDir: explicitDir,
+		}),
+	})
+	if err != nil {
+		t.Fatalf("run shell: %v", err)
+	}
+
+	if got := strings.TrimSpace(result.Content[0].Text); filepath.Clean(got) != explicitDir {
+		t.Fatalf("expected explicit working dir %q, got %q", explicitDir, got)
+	}
+}
+
 func TestShellRunRejectsInvalidArguments(t *testing.T) {
 	tool := New()
 

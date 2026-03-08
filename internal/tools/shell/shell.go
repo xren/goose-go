@@ -55,8 +55,12 @@ func (Tool) Run(ctx context.Context, call tools.Call) (tools.Result, error) {
 	}
 
 	cmd := exec.CommandContext(ctx, "/bin/sh", "-lc", args.Command)
-	if args.WorkingDir != "" {
-		cmd.Dir = args.WorkingDir
+	workingDir := args.WorkingDir
+	if workingDir == "" {
+		workingDir = call.DefaultWorkingDir
+	}
+	if workingDir != "" {
+		cmd.Dir = workingDir
 	}
 
 	output, err := cmd.CombinedOutput()
@@ -73,7 +77,7 @@ func (Tool) Run(ctx context.Context, call tools.Call) (tools.Result, error) {
 
 	structured := StructuredResult{
 		Command:    args.Command,
-		WorkingDir: args.WorkingDir,
+		WorkingDir: workingDir,
 		ExitCode:   exitCode,
 		Stdout:     string(output),
 	}
