@@ -32,6 +32,7 @@ The [goose](/Users/rex/projects/goose-go/goose) submodule is the reference imple
 - [AGENTS.md](/Users/rex/projects/goose-go/AGENTS.md): short navigation guide for agents
 - [docs/design-principles.md](/Users/rex/projects/goose-go/docs/design-principles.md): project design rules derived from the agent-first harness approach
 - [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md): target package layout and boundaries
+- [internal/agent/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/agent/ARCHITECTURE.md): high-level architecture of the runtime loop and approval flow
 - [internal/tools/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tools/ARCHITECTURE.md): high-level architecture of the tool runtime and first concrete tool
 - [internal/provider/openaicodex/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/provider/openaicodex/ARCHITECTURE.md): high-level architecture of the first concrete provider
 - [docs/invariants.md](/Users/rex/projects/goose-go/docs/invariants.md): hard rules for the project
@@ -82,6 +83,18 @@ To inspect the translated request, redacted headers, raw SSE events, and normali
 go run ./cmd/goose-go provider-smoke --debug
 ```
 
+To run the first real agent loop from the CLI:
+
+```sh
+go run ./cmd/goose-go run "list my home directory"
+```
+
+To require approval before each tool execution:
+
+```sh
+go run ./cmd/goose-go run --approve "list my home directory"
+```
+
 ## Current State
 
 The repo now has the first runtime foundation in place:
@@ -91,5 +104,6 @@ The repo now has the first runtime foundation in place:
 - structured conversation types exist
 - a SQLite-backed session store exists with tests for create, load, append, replace, and replay
 - a real `openai-codex` provider exists with a minimal runtime smoke path
+- an initial `internal/agent` loop exists for multi-turn replies, tool dispatch, max-turn limits, and approval handling
 
-The current milestone is the tool runtime, with the first `shell` tool already in place and documented next to the code.
+The current milestone is still the CLI and session flow layer; `run` now exists, and interrupt plus resume are the remaining gaps.

@@ -289,7 +289,7 @@ func buildInput(messages []conversation.Message) ([]inputItem, error) {
 				case conversation.ContentTypeToolRequest:
 					items = append(items, inputItem{
 						Type:      "function_call",
-						ID:        content.ToolRequest.ID,
+						ID:        normalizeFunctionCallItemID(*content.ToolRequest),
 						CallID:    content.ToolRequest.ID,
 						Name:      content.ToolRequest.Name,
 						Arguments: compactJSON(content.ToolRequest.Arguments),
@@ -461,11 +461,21 @@ func parseOutputItem(raw json.RawMessage) (*conversation.Content, error) {
 		if len(bytes.TrimSpace(args)) == 0 {
 			args = json.RawMessage(`{}`)
 		}
-		content := conversation.ToolRequest(item.CallID, item.Name, args)
+		content := conversation.ToolRequestWithProviderID(item.CallID, item.ID, item.Name, args)
 		return &content, nil
 	default:
 		return nil, nil
 	}
+}
+
+func normalizeFunctionCallItemID(content conversation.ToolRequestContent) string {
+	if strings.HasPrefix(content.ProviderID, "fc") {
+		return content.ProviderID
+	}
+	if strings.HasPrefix(content.ID, "fc") {
+		return content.ID
+	}
+	return "fc_" + content.ID
 }
 
 func joinTextContent(contents []conversation.Content) string {

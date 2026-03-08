@@ -13,6 +13,7 @@ const (
 	RoleSystem    Role = "system"
 	RoleUser      Role = "user"
 	RoleAssistant Role = "assistant"
+	RoleTool      Role = "tool"
 )
 
 type ContentType string
@@ -44,9 +45,10 @@ type TextContent struct {
 }
 
 type ToolRequestContent struct {
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments,omitempty"`
+	ID         string          `json:"id"`
+	ProviderID string          `json:"provider_id,omitempty"`
+	Name       string          `json:"name"`
+	Arguments  json.RawMessage `json:"arguments,omitempty"`
 }
 
 type ToolResponseContent struct {
@@ -92,12 +94,17 @@ func Text(text string) Content {
 }
 
 func ToolRequest(id, name string, arguments json.RawMessage) Content {
+	return ToolRequestWithProviderID(id, "", name, arguments)
+}
+
+func ToolRequestWithProviderID(id, providerID, name string, arguments json.RawMessage) Content {
 	return Content{
 		Type: ContentTypeToolRequest,
 		ToolRequest: &ToolRequestContent{
-			ID:        id,
-			Name:      name,
-			Arguments: arguments,
+			ID:         id,
+			ProviderID: providerID,
+			Name:       name,
+			Arguments:  arguments,
 		},
 	}
 }

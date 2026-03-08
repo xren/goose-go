@@ -29,7 +29,7 @@ func TestBuildRequestBody(t *testing.T) {
 			conversation.NewMessage(
 				conversation.RoleAssistant,
 				conversation.Text("working on it"),
-				conversation.ToolRequest("call_1", "shell", json.RawMessage(`{"command":"pwd"}`)),
+				conversation.ToolRequestWithProviderID("call_1", "fc_1", "shell", json.RawMessage(`{"command":"pwd"}`)),
 			),
 		},
 		Tools: []provider.ToolDefinition{
@@ -59,6 +59,12 @@ func TestBuildRequestBody(t *testing.T) {
 	}
 	if len(body.Input) != 3 {
 		t.Fatalf("expected 3 input items, got %d", len(body.Input))
+	}
+	if body.Input[2].ID != "fc_1" {
+		t.Fatalf("expected function call item id fc_1, got %q", body.Input[2].ID)
+	}
+	if body.Input[2].CallID != "call_1" {
+		t.Fatalf("expected function call call_id call_1, got %q", body.Input[2].CallID)
 	}
 	if len(body.Tools) != 1 || body.Tools[0].Name != "shell" {
 		t.Fatalf("expected one tool definition")
@@ -111,6 +117,9 @@ func TestProcessStream(t *testing.T) {
 	}
 	if len(got[2].Message.Content) != 2 {
 		t.Fatalf("expected text + tool request in final message")
+	}
+	if got[2].Message.Content[1].ToolRequest.ProviderID != "fc_1" {
+		t.Fatalf("expected provider id fc_1, got %#v", got[2].Message.Content[1].ToolRequest)
 	}
 	if got[3].Type != provider.EventTypeDone {
 		t.Fatalf("expected done event")

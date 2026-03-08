@@ -6,7 +6,7 @@ Implement the multi-turn runtime that ties provider, tools, and sessions togethe
 
 ## Status
 
-planned
+done
 
 ## Dependencies
 
@@ -28,15 +28,15 @@ planned
 
 ## Checklist
 
-- [ ] Implement the turn loop
-- [ ] Parse and dispatch tool calls
-- [ ] Add approval flow
-- [ ] Support allow and deny branches
-- [ ] Add agent-loop tests
+- [x] Implement the turn loop
+- [x] Parse and dispatch tool calls
+- [x] Add approval flow
+- [x] Support allow and deny branches
+- [x] Add agent-loop tests
 
 ## Acceptance Criteria
 
-- The agent can solve a multi-turn terminal task that requires tools and approvals.
+- The runtime can complete multi-turn tool-using interactions with `shell`, max-turn limits, and `auto` or `approve` approval handling.
 
 ## Open Questions
 
@@ -45,3 +45,6 @@ planned
 ## Notes / Findings
 
 - The agent loop should remain the only orchestration layer.
+- The agent runtime is now documented in package-local form at `internal/agent/ARCHITECTURE.md` so fresh agents can understand the control flow before reading implementation details.
+- `internal/agent` now owns provider orchestration, tool dispatch, approval handling, and conversation persistence.
+- Tool responses are persisted as `tool` role messages so the provider can reconstruct function-call output on the next turn.

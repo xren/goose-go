@@ -7,6 +7,7 @@ Use this file as a starting point, not the full spec.
 - [README.md](/Users/rex/projects/goose-go/README.md)
 - [docs/design-principles.md](/Users/rex/projects/goose-go/docs/design-principles.md)
 - [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md)
+- [internal/agent/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/agent/ARCHITECTURE.md)
 - [internal/tools/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tools/ARCHITECTURE.md)
 - [internal/provider/openaicodex/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/provider/openaicodex/ARCHITECTURE.md)
 - [docs/invariants.md](/Users/rex/projects/goose-go/docs/invariants.md)

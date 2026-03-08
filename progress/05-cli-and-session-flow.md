@@ -6,7 +6,7 @@ Expose the runtime through a reliable terminal interface.
 
 ## Status
 
-planned
+in_progress
 
 ## Dependencies
 
@@ -27,15 +27,15 @@ planned
 
 ## Checklist
 
-- [ ] Start a session from the CLI
-- [ ] Render streamed agent output
+- [x] Start a session from the CLI
+- [x] Render agent transcript output
 - [ ] Handle interrupts
 - [ ] Resume prior sessions
-- [ ] Add CLI smoke tests
+- [x] Add CLI smoke tests
 
 ## Acceptance Criteria
 
-- A user can start, interrupt, resume, and inspect a terminal-core session.
+- A user can start and inspect a terminal-core session from the CLI; interrupt and resume remain to be added.
 
 ## Open Questions
 
@@ -44,3 +44,6 @@ planned
 ## Notes / Findings
 
 - CLI should render runtime events, not absorb runtime logic.
+- `goose-go run` now creates a session, runs one prompt through the agent runtime, and prints the resulting transcript.
+- The remaining work in this milestone is interrupt handling and resume flow.
+- The provider replay path now preserves both function-call item IDs and call IDs so multi-turn CLI runs can survive tool use with the Codex backend.

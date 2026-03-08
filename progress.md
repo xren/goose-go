@@ -16,14 +16,14 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 | 01 | Domain model and storage | done | 00 | Structured sessions can be created, loaded, and replayed | 2026-03-08 |
 | 02 | Provider foundation and Codex-first OpenAI provider | done | 01 | Existing `codex login` user can complete streaming chat without an API key | 2026-03-08 |
 | 03 | Tool runtime and developer tools | done | 01, 02 | The runtime can list and execute the initial `shell` tool | 2026-03-08 |
-| 04 | Agent loop and approvals | in_progress | 02, 03 | Multi-turn tool-using loop works with approvals | 2026-03-08 |
-| 05 | CLI and session flow | planned | 04 | Terminal session can start, interrupt, resume, and render output | 2026-03-08 |
+| 04 | Agent loop and approvals | done | 02, 03 | Multi-turn tool-using loop works with approvals | 2026-03-08 |
+| 05 | CLI and session flow | in_progress | 04 | Terminal session can start, interrupt, resume, and render output | 2026-03-08 |
 | 06 | Compaction, evals, and hardening | planned | 04, 05 | Eval harness catches terminal-core regressions | 2026-03-08 |
 | 99 | Later parity backlog | planned | none | Deferred work is tracked outside v1 milestones | 2026-03-08 |
 
 ## Current Focus
 
-- Start Milestone 04.
+- Start Milestone 05.
 - Make the architecture executable before provider and agent code grow.
 - Use `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The first concrete provider is now documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.
@@ -34,7 +34,11 @@ Terminal core only. No server or desktop parity in v1. The first provider slice 
 - The real smoke path has been exercised successfully against local Codex auth and now documents the observed event sequence.
 - The tool contract, registry, and first in-process `shell` tool now exist.
 - The tools runtime is now documented in `internal/tools/ARCHITECTURE.md` so fresh agents can pick up the tool execution model without prior chat context.
-- The next work is the initial agent loop on top of the existing provider and `shell` tool runtime.
+- `internal/agent` now provides the first multi-turn runtime loop over the provider, session store, and `shell` tool.
+- The agent runtime is now documented in `internal/agent/ARCHITECTURE.md` so fresh agents can pick up the control flow without prior chat context.
+- `cmd/goose-go run` now exposes the agent runtime through a minimal CLI session path.
+- The Codex provider replay path now preserves function-call item IDs separately from call IDs, which fixes multi-turn CLI runs after tool use.
+- The next work is adding interrupt handling and resume on top of that command shape.
 - Keep native `goose-go` login out of the first slice.
 - Keep the `goose/` submodule as reference-only material.
 

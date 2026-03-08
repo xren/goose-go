@@ -23,6 +23,21 @@ func run(args []string) error {
 	}
 
 	switch args[0] {
+	case "run":
+		fs := flag.NewFlagSet("run", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		approve := fs.Bool("approve", false, "prompt before each tool execution")
+		debugProvider := fs.Bool("debug-provider", false, "print translated provider request and raw SSE events")
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		prompt := strings.Join(fs.Args(), " ")
+		ctx, cancel := app.RunAgentContext()
+		defer cancel()
+		return app.RunAgent(ctx, os.Stdin, os.Stdout, prompt, app.RunOptions{
+			Approve:       *approve,
+			DebugProvider: *debugProvider,
+		})
 	case "provider-smoke":
 		fs := flag.NewFlagSet("provider-smoke", flag.ContinueOnError)
 		fs.SetOutput(os.Stderr)
