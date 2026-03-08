@@ -38,10 +38,10 @@ in_progress
 - [x] Define provider interface around normalized conversation types only
 - [x] Define model config and usage metadata
 - [x] Add a Codex auth/cache reader with token refresh support
-- [ ] Keep Codex/OpenAI request-response DTOs inside the provider implementation
-- [ ] Implement one `openai-codex` provider
-- [ ] Support assembled assistant streaming output over SSE
-- [ ] Add provider integration tests
+- [x] Keep Codex/OpenAI request-response DTOs inside the provider implementation
+- [x] Implement one `openai-codex` provider
+- [x] Support assembled assistant streaming output over SSE
+- [x] Add provider integration tests
 - [x] Add the first import-boundary architecture check to `make check`
 
 ## Acceptance Criteria
@@ -64,4 +64,6 @@ in_progress
 - `internal/provider` now defines the normalized request, event, usage, and model config types that later provider implementations must satisfy.
 - `make check` now includes the first architecture import-boundary enforcement pass.
 - `internal/auth/codex` now owns file-backed Codex credential loading, JWT-derived metadata, token refresh, and atomic auth-file rewrite.
+- `internal/provider/openaicodex` now provides the first concrete provider with SSE streaming, request translation, auth header construction, and normalized final assistant messages.
+- `internal/provider/openaicodex/ARCHITECTURE.md` now documents the high-level provider architecture, boundaries, and event flow for fresh-agent handoff.
 - The filename still reflects older wording, but the active milestone scope is now Codex-first provider foundation.

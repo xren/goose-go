@@ -32,6 +32,7 @@ The [goose](/Users/rex/projects/goose-go/goose) submodule is the reference imple
 - [AGENTS.md](/Users/rex/projects/goose-go/AGENTS.md): short navigation guide for agents
 - [docs/design-principles.md](/Users/rex/projects/goose-go/docs/design-principles.md): project design rules derived from the agent-first harness approach
 - [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md): target package layout and boundaries
+- [internal/provider/openaicodex/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/provider/openaicodex/ARCHITECTURE.md): high-level architecture of the first concrete provider
 - [docs/invariants.md](/Users/rex/projects/goose-go/docs/invariants.md): hard rules for the project
 - [docs/goose-reference.md](/Users/rex/projects/goose-go/docs/goose-reference.md): what to copy, defer, or ignore from upstream Goose
 - [docs/evals.md](/Users/rex/projects/goose-go/docs/evals.md): future smoke and eval strategy
