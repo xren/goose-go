@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 
+	"goose-go/internal/models"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,16 +15,20 @@ import (
 
 	"goose-go/internal/agent"
 	"goose-go/internal/app"
+	"goose-go/internal/conversation"
 	"goose-go/internal/session"
 )
 
 type Runtime interface {
 	LoadOrCreateSession(ctx context.Context, prompt string, sessionID string) (session.Session, int, error)
 	ReplayConversation(ctx context.Context, sessionID string) (session.Session, error)
+	ListSessions(ctx context.Context) ([]session.Summary, error)
 	OpenTraceWriter(sessionID string) (app.EventRecorder, error)
 	ReplyStream(ctx context.Context, sessionID string, prompt string) (<-chan agent.Event, error)
 	PendingApproval(ctx context.Context, sessionID string) (*agent.ApprovalRequest, error)
 	ResolveApprovalStream(ctx context.Context, sessionID string, decision agent.ApprovalDecision) (<-chan agent.Event, error)
+	ListAvailableModels(ctx context.Context) ([]models.Availability, error)
+	SetSelection(ctx context.Context, provider string, model string, sessionID string) error
 	WorkingDir() string
 	ProviderModel() (string, string)
 }
@@ -56,6 +62,22 @@ type approvalViewState struct {
 	Err     string
 }
 
+type modelPickerState struct {
+	Open     bool
+	Items    []models.Availability
+	Selected int
+	Busy     bool
+	Err      string
+}
+
+type sessionPickerState struct {
+	Open     bool
+	Items    []session.Summary
+	Selected int
+	Busy     bool
+	Err      string
+}
+
 type model struct {
 	ctx        context.Context
 	runtime    Runtime
@@ -74,7 +96,16 @@ type model struct {
 	cancelRun  context.CancelFunc
 	trace      app.EventRecorder
 	approval   approvalViewState
+	picker     modelPickerState
+	sessions   sessionPickerState
 }
+
+type modelsLoadedMsg struct{ items []models.Availability }
+type modelsLoadFailedMsg struct{ err error }
+type modelSetMsg struct{}
+type modelSetFailedMsg struct{ err error }
+type sessionsLoadedMsg struct{ items []session.Summary }
+type sessionsLoadFailedMsg struct{ err error }
 
 var (
 	headerStyle        = lipgloss.NewStyle().Bold(true).Padding(0, 1)
@@ -83,6 +114,12 @@ var (
 	approvalPanelStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("220")).Padding(0, 1)
 	approvalTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("220"))
 	approvalErrorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	pickerPanelStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("69")).Padding(0, 1)
+	pickerTitleStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("69"))
+	pickerCursorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("69")).Bold(true)
+	pickerDimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	sessionPanelStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("111")).Padding(0, 1)
+	sessionTitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("111"))
 )
 
 func Run(ctx context.Context, in io.Reader, out io.Writer, runtime Runtime, opts Options) error {
@@ -130,6 +167,69 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.layout()
 		return m, nil
 	case tea.KeyMsg:
+		if m.sessions.Open {
+			switch msg.String() {
+			case "esc":
+				m.sessions = sessionPickerState{}
+				m.status = "idle"
+				m.layout()
+				return m, nil
+			case "up", "k":
+				if m.sessions.Selected > 0 {
+					m.sessions.Selected--
+				}
+				return m, nil
+			case "down", "j":
+				if m.sessions.Selected < len(m.sessions.Items)-1 {
+					m.sessions.Selected++
+				}
+				return m, nil
+			case "enter":
+				if m.sessions.Busy || len(m.sessions.Items) == 0 {
+					return m, nil
+				}
+				item := m.sessions.Items[m.sessions.Selected]
+				m.sessions.Busy = true
+				m.sessions.Err = ""
+				m.status = "loading session"
+				return m, loadSessionCmd(m.ctx, m.runtime, item.ID)
+			}
+		}
+
+		if m.picker.Open {
+			switch msg.String() {
+			case "esc":
+				m.picker = modelPickerState{}
+				m.status = "idle"
+				m.layout()
+				return m, nil
+			case "up", "k":
+				if m.picker.Selected > 0 {
+					m.picker.Selected--
+				}
+				return m, nil
+			case "down", "j":
+				if m.picker.Selected < len(m.picker.Items)-1 {
+					m.picker.Selected++
+				}
+				return m, nil
+			case "enter":
+				if m.picker.Busy || len(m.picker.Items) == 0 {
+					return m, nil
+				}
+				item := m.picker.Items[m.picker.Selected]
+				if !item.Available {
+					m.picker.Err = item.Reason
+					return m, nil
+				}
+				m.picker.Busy = true
+				m.picker.Err = ""
+				m.status = "switching model"
+				providerName, _ := m.runtime.ProviderModel()
+				return m, setModelCmd(m.ctx, m.runtime, providerName, string(item.Model.ID), m.sessionID)
+			}
+		}
+
 		if m.approval.Request != nil {
 			switch msg.String() {
 			case "ctrl+c", "esc":
@@ -158,6 +258,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
+		case "ctrl+r":
+			if m.running || m.approval.Request != nil || m.picker.Open {
+				return m, nil
+			}
+			m.errorText = ""
+			return m, loadSessionsCmd(m.ctx, m.runtime)
 		case "ctrl+c":
 			if m.running && m.cancelRun != nil {
 				m.cancelRun()
@@ -172,7 +278,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter":
-			if m.running || m.approval.Request != nil {
+			if m.running || m.approval.Request != nil || m.picker.Open {
 				return m, nil
 			}
 			prompt := strings.TrimSpace(m.input.Value())
@@ -181,6 +287,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.errorText = ""
 			m.input.SetValue("")
+			if strings.TrimSpace(prompt) == "/sessions" {
+				return m, loadSessionsCmd(m.ctx, m.runtime)
+			}
+			if strings.TrimSpace(prompt) == "/model" {
+				m.errorText = ""
+				return m, loadModelsCmd(m.ctx, m.runtime)
+			}
 			if m.handleLocalCommand(prompt) {
 				m.syncViewport()
 				return m, nil
@@ -195,7 +308,50 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
 		return m, cmd
+	case modelsLoadedMsg:
+		providerName, modelName := m.runtime.ProviderModel()
+		m.picker = modelPickerState{
+			Open:     true,
+			Items:    msg.items,
+			Selected: selectedModelIndex(msg.items, providerName, modelName),
+		}
+		m.status = "select model"
+		m.layout()
+		return m, nil
+	case sessionsLoadedMsg:
+		m.sessions = sessionPickerState{
+			Open:     true,
+			Items:    msg.items,
+			Selected: selectedSessionIndex(msg.items, m.sessionID),
+		}
+		m.status = "select session"
+		m.layout()
+		return m, nil
+	case sessionsLoadFailedMsg:
+		m.status = "failed"
+		m.errorText = msg.err.Error()
+		return m, nil
+	case modelsLoadFailedMsg:
+		m.status = "failed"
+		m.errorText = msg.err.Error()
+		return m, nil
+	case modelSetMsg:
+		providerName, modelName := m.runtime.ProviderModel()
+		m.items = append(m.items,
+			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "/model"},
+			transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("selected provider: %s\nselected model: %s", providerName, modelName)},
+		)
+		m.picker = modelPickerState{}
+		m.status = "idle"
+		m.syncViewport()
+		return m, nil
+	case modelSetFailedMsg:
+		m.picker.Busy = false
+		m.picker.Err = msg.err.Error()
+		m.status = "select model"
+		return m, nil
 	case sessionLoadedMsg:
+		m.sessions = sessionPickerState{}
 		m.sessionID = msg.session.ID
 		m.workingDir = msg.session.WorkingDir
 		m.items = buildTranscriptFromConversation(msg.session.Conversation)
@@ -271,42 +427,14 @@ func (m model) View() string {
 	if panel := m.approvalPanel(); panel != "" {
 		parts = append(parts, panel)
 	}
+	if panel := m.sessionPickerPanel(); panel != "" {
+		parts = append(parts, panel)
+	}
+	if panel := m.modelPickerPanel(); panel != "" {
+		parts = append(parts, panel)
+	}
 	parts = append(parts, m.input.View(), statusStyle.Render(m.footerText()))
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
-}
-
-func (m model) approvalPanel() string {
-	if m.approval.Request == nil {
-		return ""
-	}
-	req := m.approval.Request
-	lines := []string{
-		approvalTitleStyle.Render("Approval required"),
-		fmt.Sprintf("tool: %s", req.ToolCall.Name),
-		fmt.Sprintf("args: %s", compactArgs(req.ToolCall.Arguments)),
-	}
-	if m.sessionID != "" {
-		lines = append(lines, fmt.Sprintf("session: %s", m.sessionID))
-	}
-	if strings.TrimSpace(m.workingDir) != "" {
-		lines = append(lines, fmt.Sprintf("cwd: %s", m.workingDir))
-	}
-	if m.approval.Err != "" {
-		lines = append(lines, approvalErrorStyle.Render(m.approval.Err))
-	}
-	if m.approval.Busy {
-		lines = append(lines, "resolving...")
-	} else {
-		lines = append(lines, "a/y approve  d/n deny")
-	}
-	return approvalPanelStyle.Width(max(40, min(m.width, 120))).Render(strings.Join(lines, "\n"))
-}
-
-func (m model) footerText() string {
-	if m.approval.Request != nil {
-		return "a/y approve  d/n deny  esc/ctrl+c interrupt"
-	}
-	return "enter submit  esc/ctrl+c interrupt  ctrl+d quit"
 }
 
 func (m *model) layout() {
@@ -323,7 +451,27 @@ func (m *model) layout() {
 			approvalLines++
 		}
 	}
-	bodyHeight := m.height - headerLines - footerLines - composerLines - approvalLines
+	pickerLines := 0
+	if m.picker.Open {
+		pickerLines = len(m.picker.Items) + 3
+		if m.picker.Err != "" {
+			pickerLines++
+		}
+		if pickerLines < 6 {
+			pickerLines = 6
+		}
+	}
+	sessionLines := 0
+	if m.sessions.Open {
+		sessionLines = len(m.sessions.Items)*2 + 3
+		if m.sessions.Err != "" {
+			sessionLines++
+		}
+		if sessionLines < 6 {
+			sessionLines = 6
+		}
+	}
+	bodyHeight := m.height - headerLines - footerLines - composerLines - approvalLines - pickerLines - sessionLines
 	if bodyHeight < 3 {
 		bodyHeight = 3
 	}
@@ -356,25 +504,23 @@ func (m *model) applyAgentEvent(event agent.Event) {
 		}
 	case agent.EventTypeToolCallDetected:
 		if event.ToolCall != nil {
-			m.items = append(m.items, transcriptItem{
-				Kind:   kindSystem,
-				Prefix: "assistant requested tool",
-				Text:   fmt.Sprintf("%s %s", event.ToolCall.Name, compactArgs(event.ToolCall.Arguments)),
-			})
+			upsertToolGroup(&m.items, *event.ToolCall, "requested")
 		}
 	case agent.EventTypeToolExecutionStarted:
 		if event.ToolCall != nil {
-			m.items = append(m.items, transcriptItem{Kind: kindSystem, Prefix: "tool", Text: fmt.Sprintf("running %s", event.ToolCall.Name)})
+			markToolGroupRunning(&m.items, *event.ToolCall)
 		}
 	case agent.EventTypeToolMessagePersisted:
 		if event.ToolResult != nil {
-			name := "tool"
-			if event.ToolCall != nil && event.ToolCall.Name != "" {
-				name = fmt.Sprintf("tool[%s]", event.ToolCall.Name)
+			if event.ToolCall != nil && findToolGroup(m.items, event.ToolCall.ID) < 0 {
+				upsertToolGroup(&m.items, *event.ToolCall, "requested")
 			}
-			for _, part := range event.ToolResult.Content {
-				m.items = append(m.items, transcriptItem{Kind: kindTool, Prefix: name, Text: part.Text})
+			response := conversation.ToolResponseContent{
+				ID:      event.ToolResult.ToolCallID,
+				IsError: event.ToolResult.IsError,
+				Content: event.ToolResult.Content,
 			}
+			upsertToolResult(&m.items, response)
 		}
 	case agent.EventTypeCompactionStarted:
 		m.items = append(m.items, transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("compacting context (%s, %d tokens)", event.CompactionReason, event.TokensBefore)})
@@ -406,20 +552,6 @@ func (m *model) applyAgentEvent(event agent.Event) {
 	}
 	m.layout()
 	m.syncViewport()
-}
-
-func (m *model) handleLocalCommand(prompt string) bool {
-	providerName, modelName := m.runtime.ProviderModel()
-	cmd, ok := app.LocalCommand(prompt, providerName, modelName)
-	if !ok {
-		return false
-	}
-	m.status = "idle"
-	m.items = append(m.items,
-		transcriptItem{Kind: kindSystem, Prefix: "system", Text: prompt},
-		transcriptItem{Kind: kindSystem, Prefix: "system", Text: cmd.Output},
-	)
-	return true
 }
 
 func (m *model) upsertLiveAssistant(delta string) {

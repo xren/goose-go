@@ -10,13 +10,13 @@ It does not own provider logic, tool execution, or session persistence rules. It
 - TUI state reduction
 - transcript rendering
 - input handling
-- local slash-command handling for runtime metadata
+- local slash-command handling for runtime metadata and in-TUI model selection
 - runtime event consumption
 - interrupt wiring at the UI layer
 
 ## Current Stage
 
-This package currently implements the Stage 1 MVP shape:
+This package now contains the full Stage 1 MVP plus the first Stage 2 interaction slices:
 
 - single-column layout
 - transcript viewport
@@ -24,8 +24,10 @@ This package currently implements the Stage 1 MVP shape:
 - submit/run flow
 - resume by known session id
 - live rendering from `ReplyStream(...)`
-- tool, compaction, and failure notices
+- grouped tool blocks plus compaction and failure notices
 - interrupt of the active run
+- registry-backed model selection through `/model`
+- recent-session entry through `/sessions` and `Ctrl-R`
 
 Shell execution now requires approval on the TUI surface, and approval-required runs are handled inside the TUI through a focused approval panel backed by the existing approval continuation seam in `internal/agent` and `internal/app`.
 
@@ -157,7 +159,8 @@ Rendering rules:
 - user and assistant text render as role-prefixed transcript lines
 - streamed assistant deltas accumulate in a temporary live buffer
 - final assistant messages replace that live buffer to avoid duplicate output
-- tool requests and tool results render as explicit transcript items
+- each tool call is grouped into one logical transcript block keyed by tool call id
+- grouped tool blocks carry args, lifecycle status, and final output/error text
 - compaction and failure events render as system notices
 
 Current transcript replay behavior:
@@ -166,11 +169,10 @@ Current transcript replay behavior:
 - live events are appended after replay
 - the TUI does not read trace files to reconstruct history
 
-## Stage 1 Constraints
+## Current Constraints
 
 - single-column only
-- no session picker
-- no slash commands
+- no command palette beyond local slash commands
 - no side panels
 - no SQLite polling for live updates
 
@@ -179,22 +181,27 @@ Current implementation detail:
 - `Ctrl-C` quits when idle
 - `Ctrl-C` or `Esc` interrupts the active run when running
 - `Ctrl-D` quits only when idle
+- `Ctrl-R` opens the recent-session picker when idle
+- `/help` lists the current local command surface
+- `/session` reports current session metadata from TUI/runtime state
+- `/new` resets the interactive surface to a fresh session state
 - shell-triggered approval-required runs open a focused approval panel with allow/deny actions
-- `/model` is handled locally in the TUI and does not start a provider run
+- `/model` is handled locally in the TUI, opens a registry-backed picker, and does not start a provider run
+- `/sessions` is handled locally in the TUI, opens a recent-session picker, and loads the selected session through the runtime boundary
 - the TUI root context is now long-lived and cancelable, not capped by a fixed 5-minute deadline
 
 ## Current Gaps
 
-The initial scaffold is intentionally incomplete. Remaining Stage 1 work:
+Remaining Stage 2 work:
 
-1. stronger scripted smoke coverage around run start, tool activity, and interrupt
-2. manual TUI runbook in repo docs
-3. UI stabilization around long transcripts and status presentation
+1. richer command surfaces
+2. navigation and status polish
+3. command-surface expansion beyond `/model` and `/sessions`
 
 ## Next Steps
 
-Stage 1 is complete. The next TUI work is Stage 2:
+The next TUI work stays in Stage 2:
 
-1. session picker / recent-session entry flow
-2. grouped tool rendering and richer command surfaces
-3. registry-backed model selection inside the TUI
+1. richer command surfaces
+2. navigation and status polish
+3. command-surface expansion beyond `/model` and `/sessions`

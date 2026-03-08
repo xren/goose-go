@@ -9,6 +9,7 @@ import (
 
 	"goose-go/internal/agent"
 	"goose-go/internal/app"
+	"goose-go/internal/models"
 	"goose-go/internal/session"
 )
 
@@ -54,6 +55,16 @@ func loadSessionCmd(ctx context.Context, runtime Runtime, sessionID string) tea.
 	}
 }
 
+func loadSessionsCmd(ctx context.Context, runtime Runtime) tea.Cmd {
+	return func() tea.Msg {
+		items, err := runtime.ListSessions(ctx)
+		if err != nil {
+			return sessionsLoadFailedMsg{err: err}
+		}
+		return sessionsLoadedMsg{items: items}
+	}
+}
+
 func startRunCmd(ctx context.Context, runtime Runtime, async chan tea.Msg, prompt string, sessionID string) tea.Cmd {
 	return func() tea.Msg {
 		record, _, err := runtime.LoadOrCreateSession(ctx, prompt, sessionID)
@@ -91,6 +102,25 @@ func resolveApprovalCmd(ctx context.Context, runtime Runtime, async chan tea.Msg
 		}
 		go bridgeStream(async, runCtx, stream)
 		return approvalStartedMsg{trace: trace, cancel: cancel}
+	}
+}
+
+func loadModelsCmd(ctx context.Context, runtime Runtime) tea.Cmd {
+	return func() tea.Msg {
+		items, err := runtime.ListAvailableModels(ctx)
+		if err != nil {
+			return modelsLoadFailedMsg{err: err}
+		}
+		return modelsLoadedMsg{items: items}
+	}
+}
+
+func setModelCmd(ctx context.Context, runtime Runtime, providerName string, modelName string, sessionID string) tea.Cmd {
+	return func() tea.Msg {
+		if err := runtime.SetSelection(ctx, providerName, modelName, sessionID); err != nil {
+			return modelSetFailedMsg{err: err}
+		}
+		return modelSetMsg{}
 	}
 }
 
@@ -137,6 +167,27 @@ func fallback(value string, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+func selectedModelIndex(items []models.Availability, providerName string, modelName string) int {
+	for i, item := range items {
+		if string(item.Model.Provider) == providerName && string(item.Model.ID) == modelName {
+			return i
+		}
+	}
+	return 0
+}
+
+func selectedSessionIndex(items []session.Summary, sessionID string) int {
+	if sessionID == "" {
+		return 0
+	}
+	for i, item := range items {
+		if item.ID == sessionID {
+			return i
+		}
+	}
+	return 0
 }
 
 func runtimeResultStatus(result *agent.Result) string {

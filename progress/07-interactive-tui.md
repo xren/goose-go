@@ -41,8 +41,14 @@ Current note:
 - the detailed Stage 2 execution plan now lives in [07b-tui-stage2-ux.md](/Users/rex/projects/goose-go/progress/07b-tui-stage2-ux.md)
 - the first Stage 2 step, the approval continuation seam in `internal/agent` and `internal/app`, is now implemented
 - the Stage 2 approval UI is now implemented in `internal/tui`
-- the next Stage 2 step is the local model-registry and model-selection work tracked in [07d-model-registry-and-selection.md](/Users/rex/projects/goose-go/progress/07d-model-registry-and-selection.md)
-- the first local slash command, `/model`, is now available in both `run` and `tui`, but it is still a static local reporter until the registry-backed model-selection phase lands
+- the local model-registry and runtime-selection work tracked in [07d-model-registry-and-selection.md](/Users/rex/projects/goose-go/progress/07d-model-registry-and-selection.md) is now complete
+- session persistence of provider/model is now implemented
+- the TUI `/model` picker is now implemented on top of the registry-backed selection path
+- the TUI recent-session picker is now implemented on top of `ListSessions(...)` through `/sessions` and `Ctrl-R`
+- tool lifecycle is now rendered as grouped transcript blocks in the TUI instead of flat request/result lines
+- the first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`
+- `goose-go run /model` remains a local reporter, while `goose-go tui /model` now opens the picker
+- the next Stage 2 work now includes a dedicated styling/layout pass and a token-based theme plan inspired by `pi-mono`
 
 ## Acceptance Criteria
 
@@ -66,3 +72,5 @@ Current note:
   - [07a-tui-stage1-mvp.md](/Users/rex/projects/goose-go/progress/07a-tui-stage1-mvp.md)
   - [07b-tui-stage2-ux.md](/Users/rex/projects/goose-go/progress/07b-tui-stage2-ux.md)
   - [07c-tui-architecture.md](/Users/rex/projects/goose-go/progress/07c-tui-architecture.md)
+  - [07e-tui-styling-and-layout.md](/Users/rex/projects/goose-go/progress/07e-tui-styling-and-layout.md)
+  - [07f-tui-theme-system.md](/Users/rex/projects/goose-go/progress/07f-tui-theme-system.md)

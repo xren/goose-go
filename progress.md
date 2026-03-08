@@ -32,14 +32,22 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - The approval continuation seam for Stage 2 is now implemented in `internal/agent` and `internal/app`.
 - The Stage 2 approval UI is now implemented in `internal/tui` on top of the approval continuation seam.
 - Shell execution now requires approval by default on both main user surfaces: `goose-go run` uses inline terminal approval prompts by default, and `goose-go tui` uses the in-app approval panel.
-- The next Stage 2 implementation step is a `pi-mono`-style local model registry and registry-backed model selection.
-- The first local slash command, `/model`, is now implemented in both `goose-go run` and `goose-go tui`, but it still reports hard-coded runtime selection rather than using a registry-backed model system.
+- The `pi-mono`-style local model registry and runtime-selection slice are now complete in `internal/models` and `internal/app`.
+- Session persistence of provider/model is now implemented, and resumed sessions reuse that selection by default.
+- The TUI `/model` picker is now implemented on top of the registry-backed selection path.
+- The TUI recent-session picker is now implemented on top of `ListSessions(...)`, exposed through `/sessions` and `Ctrl-R`.
+- Tool lifecycle is now rendered as grouped transcript blocks in the TUI instead of flat request/result lines.
+- The first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`.
+- `goose-go run /model` remains a local reporter, while `goose-go tui /model` now opens the registry-backed picker.
+- The next Stage 2 TUI work is now split more explicitly: interaction features are landing already, and the next planning slice adds a `pi-mono`-informed styling/layout pass plus a token-based theme system.
 - `goose-go run`, `goose-go sessions`, and `goose-go tui` no longer share a hard 5-minute root context deadline; they now use long-lived cancelable contexts suitable for multi-hour sessions.
 - Milestone 07 is now split into a rollup plus supporting plan files:
   - [progress/07a-tui-stage1-mvp.md](/Users/rex/projects/goose-go/progress/07a-tui-stage1-mvp.md)
   - [progress/07b-tui-stage2-ux.md](/Users/rex/projects/goose-go/progress/07b-tui-stage2-ux.md)
   - [progress/07c-tui-architecture.md](/Users/rex/projects/goose-go/progress/07c-tui-architecture.md)
   - [progress/07d-model-registry-and-selection.md](/Users/rex/projects/goose-go/progress/07d-model-registry-and-selection.md)
+  - [progress/07e-tui-styling-and-layout.md](/Users/rex/projects/goose-go/progress/07e-tui-styling-and-layout.md)
+  - [progress/07f-tui-theme-system.md](/Users/rex/projects/goose-go/progress/07f-tui-theme-system.md)
 - The TUI planning files are now populated with the execution plan; implementation should start from `07c` and `07a`, not from the rollup alone.
 - `internal/agent` now exposes a live event stream through `ReplyStream`, and `Reply` is now a wrapper over that streaming runtime.
 - `internal/app` and `cmd/goose-go run` now consume the live agent event stream instead of rendering only after completion.

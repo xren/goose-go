@@ -7,6 +7,8 @@ import (
 	"io"
 	"time"
 
+	"goose-go/internal/models"
+
 	"goose-go/internal/conversation"
 	"goose-go/internal/provider"
 	"goose-go/internal/provider/openaicodex"
@@ -40,15 +42,16 @@ func RunProviderSmoke(ctx context.Context, out io.Writer, prompt string, opts Pr
 		return diagnoseProviderError("openai-codex", fmt.Errorf("create openai-codex provider: %w", err), opts.Debug)
 	}
 
+	_, selection, err := models.ResolveSelection(defaultProviderName, "")
+	if err != nil {
+		return diagnoseProviderError(defaultProviderName, err, opts.Debug)
+	}
 	stream, err := p.Stream(ctx, provider.Request{
 		SystemPrompt: "You are a concise assistant.",
 		Messages: []conversation.Message{
 			conversation.NewMessage(conversation.RoleUser, conversation.Text(prompt)),
 		},
-		Model: provider.ModelConfig{
-			Provider: "openai-codex",
-			Model:    "gpt-5-codex",
-		},
+		Model: models.ToModelConfig(selection),
 	})
 	if err != nil {
 		return diagnoseProviderError("openai-codex", fmt.Errorf("start provider smoke request: %w", err), opts.Debug)

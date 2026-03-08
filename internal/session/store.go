@@ -18,6 +18,8 @@ type Session struct {
 	ID           string                    `json:"id"`
 	Name         string                    `json:"name"`
 	WorkingDir   string                    `json:"working_dir"`
+	Provider     string                    `json:"provider"`
+	Model        string                    `json:"model"`
 	Type         Type                      `json:"type"`
 	CreatedAt    int64                     `json:"created_at"`
 	UpdatedAt    int64                     `json:"updated_at"`
@@ -28,6 +30,8 @@ type Session struct {
 type CreateParams struct {
 	Name       string
 	WorkingDir string
+	Provider   string
+	Model      string
 	Type       Type
 }
 
@@ -35,6 +39,8 @@ type Summary struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
 	WorkingDir   string `json:"working_dir"`
+	Provider     string `json:"provider"`
+	Model        string `json:"model"`
 	Type         Type   `json:"type"`
 	CreatedAt    int64  `json:"created_at"`
 	UpdatedAt    int64  `json:"updated_at"`
@@ -75,6 +81,7 @@ type Store interface {
 	ReplayConversation(ctx context.Context, sessionID string) (conversation.Conversation, error)
 	AppendCompaction(ctx context.Context, sessionID string, params CompactionParams) (Compaction, error)
 	GetLatestCompaction(ctx context.Context, sessionID string) (Compaction, error)
+	UpdateSessionSelection(ctx context.Context, sessionID string, provider string, model string) (Session, error)
 }
 
 var ErrSessionNotFound = errors.New("session not found")

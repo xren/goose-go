@@ -65,6 +65,13 @@ var migrations = []migration{
 				ON compactions(session_id, created_at DESC);
 		`,
 	},
+	{
+		version: 3,
+		up: `
+			ALTER TABLE sessions ADD COLUMN provider TEXT NOT NULL DEFAULT 'openai-codex';
+			ALTER TABLE sessions ADD COLUMN model TEXT NOT NULL DEFAULT 'gpt-5-codex';
+		`,
+	},
 }
 
 var _ session.Store = (*Store)(nil)
@@ -100,6 +107,8 @@ func (s *Store) CreateSession(ctx context.Context, params session.CreateParams) 
 		ID:           newSessionID(),
 		Name:         params.Name,
 		WorkingDir:   params.WorkingDir,
+		Provider:     params.Provider,
+		Model:        params.Model,
 		Type:         params.Type,
 		CreatedAt:    now,
 		UpdatedAt:    now,
@@ -118,11 +127,13 @@ func (s *Store) CreateSession(ctx context.Context, params session.CreateParams) 
 
 	_, err = s.db.ExecContext(
 		ctx,
-		`INSERT INTO sessions (id, name, working_dir, type, created_at, updated_at, message_count, conversation_json)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO sessions (id, name, working_dir, provider, model, type, created_at, updated_at, message_count, conversation_json)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		record.ID,
 		record.Name,
 		record.WorkingDir,
+		record.Provider,
+		record.Model,
 		record.Type,
 		record.CreatedAt,
 		record.UpdatedAt,
@@ -143,7 +154,7 @@ func (s *Store) GetSession(ctx context.Context, id string) (session.Session, err
 func (s *Store) ListSessions(ctx context.Context) ([]session.Summary, error) {
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, name, working_dir, type, created_at, updated_at, message_count
+		`SELECT id, name, working_dir, provider, model, type, created_at, updated_at, message_count
 		 FROM sessions
 		 ORDER BY updated_at DESC`,
 	)
@@ -159,6 +170,8 @@ func (s *Store) ListSessions(ctx context.Context) ([]session.Summary, error) {
 			&item.ID,
 			&item.Name,
 			&item.WorkingDir,
+			&item.Provider,
+			&item.Model,
 			&item.Type,
 			&item.CreatedAt,
 			&item.UpdatedAt,
@@ -267,6 +280,21 @@ func (s *Store) AppendCompaction(
 	})
 }
 
+func (s *Store) UpdateSessionSelection(ctx context.Context, sessionID string, providerName string, modelName string) (session.Session, error) {
+	return s.withImmediateTx(ctx, func(conn *sql.Conn) (session.Session, error) {
+		record, err := getSession(ctx, conn, sessionID)
+		if err != nil {
+			return session.Session{}, err
+		}
+		record.Provider = providerName
+		record.Model = modelName
+		if _, err := conn.ExecContext(ctx, `UPDATE sessions SET provider = ?, model = ?, updated_at = ? WHERE id = ?`, record.Provider, record.Model, time.Now().UTC().Unix(), record.ID); err != nil {
+			return session.Session{}, fmt.Errorf("update session selection: %w", err)
+		}
+		return getSession(ctx, conn, sessionID)
+	})
+}
+
 func (s *Store) GetLatestCompaction(ctx context.Context, sessionID string) (session.Compaction, error) {
 	row := s.db.QueryRowContext(
 		ctx,
@@ -372,7 +400,7 @@ func (s *Store) withImmediateTxCompaction(
 func getSession(ctx context.Context, queryer sessionQueryer, id string) (session.Session, error) {
 	row := queryer.QueryRowContext(
 		ctx,
-		`SELECT id, name, working_dir, type, created_at, updated_at, message_count, conversation_json
+		`SELECT id, name, working_dir, provider, model, type, created_at, updated_at, message_count, conversation_json
 		 FROM sessions WHERE id = ?`,
 		id,
 	)
@@ -383,6 +411,8 @@ func getSession(ctx context.Context, queryer sessionQueryer, id string) (session
 		&record.ID,
 		&record.Name,
 		&record.WorkingDir,
+		&record.Provider,
+		&record.Model,
 		&record.Type,
 		&record.CreatedAt,
 		&record.UpdatedAt,

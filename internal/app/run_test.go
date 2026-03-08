@@ -422,3 +422,36 @@ func contains(values []string, want string) bool {
 	}
 	return false
 }
+
+func TestRunAgentResumeUsesPersistedProviderModel(t *testing.T) {
+	originalProviderFactory := newRunProvider
+	originalStoreOpener := openRunStore
+	t.Cleanup(func() {
+		newRunProvider = originalProviderFactory
+		openRunStore = originalStoreOpener
+	})
+
+	newRunProvider = func(_ io.Writer) (provider.Provider, error) {
+		return scriptedAppProvider{
+			respond: func(req provider.Request) []provider.Event {
+				msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text(req.Model.Model))
+				return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+			},
+		}, nil
+	}
+
+	dbPath := t.TempDir() + "/sessions.db"
+	var first bytes.Buffer
+	if err := RunAgent(context.Background(), strings.NewReader("y\n"), &first, "first prompt", RunOptions{RequireApproval: true, Approve: true, WorkingDir: t.TempDir(), DBPath: dbPath, Model: "gpt-5.3-codex"}); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	sessionID := strings.Split(strings.SplitN(first.String(), "\n", 2)[0], ": ")[1]
+
+	var second bytes.Buffer
+	if err := RunAgent(context.Background(), strings.NewReader("y\n"), &second, "second prompt", RunOptions{RequireApproval: true, Approve: true, WorkingDir: t.TempDir(), DBPath: dbPath, SessionID: sessionID}); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	if !strings.Contains(second.String(), "assistant> gpt-5.3-codex") {
+		t.Fatalf("expected resumed run to use persisted model, got %q", second.String())
+	}
+}

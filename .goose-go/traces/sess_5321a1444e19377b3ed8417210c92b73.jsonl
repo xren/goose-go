@@ -1,0 +1,29 @@
+{"recorded_at":"2026-03-08T22:03:17.470637Z","type":"run_started","session_id":"sess_5321a1444e19377b3ed8417210c92b73"}
+{"recorded_at":"2026-03-08T22:03:17.473012Z","type":"turn_started","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1}
+{"recorded_at":"2026-03-08T22:03:17.473377Z","type":"user_message_persisted","session_id":"sess_5321a1444e19377b3ed8417210c92b73","message":{"id":"msg_aee393fba9bf6039","role":"user","created_at":"2026-03-08T22:03:17.469659Z","content":[{"type":"text","text":{"text":"test"}}]}}
+{"recorded_at":"2026-03-08T22:03:21.072094Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":"It"}
+{"recorded_at":"2026-03-08T22:03:21.078844Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" looks"}
+{"recorded_at":"2026-03-08T22:03:21.085154Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" like"}
+{"recorded_at":"2026-03-08T22:03:21.097088Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" you"}
+{"recorded_at":"2026-03-08T22:03:21.104598Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" just"}
+{"recorded_at":"2026-03-08T22:03:21.108615Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" typed"}
+{"recorded_at":"2026-03-08T22:03:21.125818Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" “"}
+{"recorded_at":"2026-03-08T22:03:21.132239Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":".”"}
+{"recorded_at":"2026-03-08T22:03:21.132817Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":"test"}
+{"recorded_at":"2026-03-08T22:03:21.133958Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" If"}
+{"recorded_at":"2026-03-08T22:03:21.140749Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" you"}
+{"recorded_at":"2026-03-08T22:03:21.157301Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" need"}
+{"recorded_at":"2026-03-08T22:03:21.164882Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" help"}
+{"recorded_at":"2026-03-08T22:03:21.168027Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" with"}
+{"recorded_at":"2026-03-08T22:03:21.181998Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" anything"}
+{"recorded_at":"2026-03-08T22:03:21.186766Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":","}
+{"recorded_at":"2026-03-08T22:03:21.187409Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" specific"}
+{"recorded_at":"2026-03-08T22:03:21.187986Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" feel"}
+{"recorded_at":"2026-03-08T22:03:21.192825Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" free"}
+{"recorded_at":"2026-03-08T22:03:21.194767Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" to"}
+{"recorded_at":"2026-03-08T22:03:21.200304Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" let"}
+{"recorded_at":"2026-03-08T22:03:21.208856Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" me"}
+{"recorded_at":"2026-03-08T22:03:21.210731Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":" know"}
+{"recorded_at":"2026-03-08T22:03:21.216267Z","type":"provider_text_delta","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"delta":"!"}
+{"recorded_at":"2026-03-08T22:03:21.277124Z","type":"assistant_message_complete","session_id":"sess_5321a1444e19377b3ed8417210c92b73","turn":1,"message":{"id":"msg_afb2a55199aaf35f","role":"assistant","created_at":"2026-03-08T22:03:21.271658Z","content":[{"type":"text","text":{"text":"It looks like you just typed “test.” If you need help with anything specific, feel free to let me know!"}}]}}
+{"recorded_at":"2026-03-08T22:03:21.280155Z","type":"run_completed","session_id":"sess_5321a1444e19377b3ed8417210c92b73","result":{"status":"completed","session":{"id":"sess_5321a1444e19377b3ed8417210c92b73","name":"test","working_dir":"/Users/rex/projects/goose-go","provider":"","model":"","type":"terminal","created_at":1773007397,"updated_at":1773007401,"message_count":2,"conversation":{"messages":[{"id":"msg_aee393fba9bf6039","role":"user","created_at":"2026-03-08T22:03:17.469659Z","content":[{"type":"text","text":{"text":"test"}}]},{"id":"msg_afb2a55199aaf35f","role":"assistant","created_at":"2026-03-08T22:03:21.271658Z","content":[{"type":"text","text":{"text":"It looks like you just typed “test.” If you need help with anything specific, feel free to let me know!"}}]}]}},"turns":1}}

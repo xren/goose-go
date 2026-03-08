@@ -8,7 +8,7 @@ This stage is registry-first. It should not add custom `models.json` support or 
 
 ## Status
 
-planned
+done
 
 ## Dependencies
 
@@ -112,6 +112,8 @@ Rules:
 
 ### Phase 0: Registry and availability
 
+Status: done
+
 Tasks:
 
 - add `internal/models`
@@ -125,6 +127,8 @@ Acceptance:
 - availability is computed locally and does not require a provider round trip
 
 ### Phase 1: Runtime and CLI selection
+
+Status: done
 
 Tasks:
 
@@ -141,11 +145,24 @@ Acceptance:
 
 ### Phase 2: Session persistence and local commands
 
+Status: done
+
 Tasks:
 
 - persist provider/model in session metadata
 - make resume reuse persisted provider/model by default
 - update `/model` local reporting to read runtime/session metadata
+
+Implemented so far:
+
+- `internal/models` now provides the built-in local registry and auth-aware availability filtering
+- `internal/app` runtime construction now resolves provider/model through the registry instead of hard-coded model behavior
+- `goose-go run` and `goose-go tui` now accept `--provider` and `--model`
+- `goose-go models` now lists registry-backed models with availability state
+- sessions now persist provider/model metadata
+- resumed sessions now reuse their persisted provider/model by default and update the runtime selection before the next provider turn
+- `goose-go run /model` now reports the actual runtime/session selection locally
+- `goose-go tui /model` is now the registry-backed picker entrypoint
 
 Acceptance:
 
@@ -154,12 +171,21 @@ Acceptance:
 
 ### Phase 3: TUI picker
 
+Status: done
+
 Tasks:
 
 - replace the TUI `/model` reporter with a picker or modal
 - list available models for the current provider
 - optionally show unavailable models disabled with a reason
 - selecting a model updates the active runtime selection for future runs in that TUI session
+
+Implemented:
+
+- `/model` now opens a registry-backed picker in the TUI
+- the picker preselects the current runtime selection
+- unavailable models stay visible with a reason instead of disappearing silently
+- selecting a model updates runtime state immediately and persists to the active session when one exists
 
 Acceptance:
 

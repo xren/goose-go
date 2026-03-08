@@ -6,6 +6,8 @@ import (
 	"io"
 	"path/filepath"
 
+	"goose-go/internal/models"
+
 	"goose-go/internal/agent"
 	"goose-go/internal/compaction"
 	"goose-go/internal/provider"
@@ -25,10 +27,7 @@ type Runtime struct {
 	model      string
 }
 
-const (
-	defaultProviderName = "openai-codex"
-	defaultModelName    = "gpt-5-codex"
-)
+const defaultProviderName = "openai-codex"
 
 var newRunProvider = func(debugOut io.Writer) (provider.Provider, error) {
 	if debugOut != nil {
@@ -49,6 +48,10 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 	if opts.MaxTurns <= 0 {
 		opts.MaxTurns = 8
 	}
+	selection, err := resolveRuntimeSelection(opts)
+	if err != nil {
+		return nil, err
+	}
 
 	dbPath := resolveDBPath(workingDir, opts.DBPath)
 
@@ -61,10 +64,10 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 	if opts.DebugProvider {
 		debugOut = out
 	}
-	p, err := newRunProvider(debugOut)
+	p, err := openProvider(selection.Provider, debugOut)
 	if err != nil {
 		_ = store.Close()
-		return nil, diagnoseRunError(defaultProviderName, fmt.Errorf("create %s provider: %w", defaultProviderName, err), opts.DebugProvider)
+		return nil, diagnoseRunError(selection.Provider, fmt.Errorf("create %s provider: %w", selection.Provider, err), opts.DebugProvider)
 	}
 
 	registry := tools.NewRegistry()
@@ -84,11 +87,7 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 
 	runtime, err := agent.New(store, p, registry, agent.Config{
 		SystemPrompt: defaultRunSystemPrompt,
-		Model: provider.ModelConfig{
-			Provider:      defaultProviderName,
-			Model:         defaultModelName,
-			ContextWindow: openAICodexContextWindow,
-		},
+		Model:        selection.ModelConfig,
 		Compaction:   compaction.DefaultSettings(),
 		MaxTurns:     opts.MaxTurns,
 		ApprovalMode: approvalMode,
@@ -108,8 +107,8 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 		agent:      runtime,
 		workingDir: workingDir,
 		traceDir:   traceDir,
-		provider:   defaultProviderName,
-		model:      defaultModelName,
+		provider:   selection.Provider,
+		model:      selection.Model,
 	}, nil
 }
 
@@ -121,11 +120,25 @@ func (r *Runtime) Close() error {
 }
 
 func (r *Runtime) LoadOrCreateSession(ctx context.Context, prompt string, sessionID string) (session.Session, int, error) {
-	return loadOrCreateSession(ctx, r.store, prompt, r.workingDir, sessionID)
+	record, count, err := loadOrCreateSession(ctx, r.store, prompt, r.workingDir, r.provider, r.model, sessionID)
+	if err != nil {
+		return session.Session{}, 0, err
+	}
+	if sessionID != "" && record.Provider != "" && record.Model != "" {
+		r.applySessionSelection(record.Provider, record.Model)
+	}
+	return record, count, nil
 }
 
 func (r *Runtime) ReplayConversation(ctx context.Context, sessionID string) (session.Session, error) {
-	return r.store.GetSession(ctx, sessionID)
+	record, err := r.store.GetSession(ctx, sessionID)
+	if err != nil {
+		return session.Session{}, err
+	}
+	if record.Provider != "" && record.Model != "" {
+		r.applySessionSelection(record.Provider, record.Model)
+	}
+	return record, nil
 }
 
 func (r *Runtime) ListSessions(ctx context.Context) ([]session.Summary, error) {
@@ -164,11 +177,77 @@ func (r *Runtime) ResolveApprovalStream(ctx context.Context, sessionID string, d
 	return r.agent.ResolveApprovalStream(ctx, sessionID, decision)
 }
 
-const openAICodexContextWindow = 128000
-
 func resolveDBPath(workingDir string, dbPath string) string {
 	if dbPath != "" {
 		return dbPath
 	}
 	return filepath.Join(workingDir, defaultRunDBDir, defaultRunDBName)
+}
+
+type runtimeSelection struct {
+	Provider    string
+	Model       string
+	ModelConfig provider.ModelConfig
+}
+
+func resolveRuntimeSelection(opts RunOptions) (runtimeSelection, error) {
+	providerID := opts.Provider
+	if providerID == "" {
+		providerID = defaultProviderName
+	}
+	_, modelSpec, err := models.ResolveSelection(providerID, opts.Model)
+	if err != nil {
+		return runtimeSelection{}, err
+	}
+	return runtimeSelection{
+		Provider:    providerID,
+		Model:       string(modelSpec.ID),
+		ModelConfig: models.ToModelConfig(modelSpec),
+	}, nil
+}
+
+func openProvider(providerID string, debugOut io.Writer) (provider.Provider, error) {
+	switch providerID {
+	case string(models.ProviderOpenAICodex):
+		return newRunProvider(debugOut)
+	default:
+		return nil, fmt.Errorf("unsupported provider %q", providerID)
+	}
+}
+
+func (r *Runtime) Selection() (string, string) {
+	return r.provider, r.model
+}
+
+func (r *Runtime) applySessionSelection(providerName string, modelName string) {
+	_, modelSpec, err := models.ResolveSelection(providerName, modelName)
+	if err != nil {
+		return
+	}
+	r.provider = providerName
+	r.model = string(modelSpec.ID)
+	if r.agent != nil {
+		r.agent.SetModelConfig(models.ToModelConfig(modelSpec))
+	}
+}
+
+func (r *Runtime) ListAvailableModels(ctx context.Context) ([]models.Availability, error) {
+	return models.NewResolver().ListAvailable(ctx, r.provider)
+}
+
+func (r *Runtime) SetSelection(ctx context.Context, providerName string, modelName string, sessionID string) error {
+	_, modelSpec, err := models.ResolveSelection(providerName, modelName)
+	if err != nil {
+		return err
+	}
+	if sessionID != "" {
+		record, err := r.store.UpdateSessionSelection(ctx, sessionID, providerName, string(modelSpec.ID))
+		if err != nil {
+			return err
+		}
+		r.applySessionSelection(record.Provider, record.Model)
+		return nil
+	}
+	r.applySessionSelection(providerName, string(modelSpec.ID))
+	return nil
 }

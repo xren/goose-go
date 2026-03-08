@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"goose-go/internal/conversation"
+	"goose-go/internal/tools"
 )
 
 func buildTranscriptFromConversation(conv conversation.Conversation) []transcriptItem {
@@ -40,14 +41,16 @@ func appendMessageItems(items *[]transcriptItem, message conversation.Message) {
 			if content.ToolRequest == nil {
 				continue
 			}
-			*items = append(*items, transcriptItem{Kind: kindSystem, Prefix: "assistant requested tool", Text: fmt.Sprintf("%s %s", content.ToolRequest.Name, compactArgs(content.ToolRequest.Arguments))})
+			upsertToolGroup(items, tools.Call{
+				ID:        content.ToolRequest.ID,
+				Name:      content.ToolRequest.Name,
+				Arguments: content.ToolRequest.Arguments,
+			}, "requested")
 		case conversation.ContentTypeToolResponse:
 			if content.ToolResponse == nil {
 				continue
 			}
-			for _, result := range content.ToolResponse.Content {
-				*items = append(*items, transcriptItem{Kind: kindTool, Prefix: "tool", Text: result.Text})
-			}
+			upsertToolResult(items, *content.ToolResponse)
 		case conversation.ContentTypeSystemNotification:
 			if content.SystemNotification == nil {
 				continue
@@ -82,6 +85,108 @@ func renderItems(items []transcriptItem, width int) string {
 		return lipgloss.NewStyle().Width(width).Render(content)
 	}
 	return content
+}
+
+func upsertToolGroup(items *[]transcriptItem, call tools.Call, status string) {
+	index := findToolGroup(*items, call.ID)
+	group := transcriptItem{
+		Kind:   kindTool,
+		Key:    call.ID,
+		Prefix: fmt.Sprintf("tool[%s]", call.Name),
+		Text:   renderToolGroup(status, compactArgs(call.Arguments), "", false),
+		Meta:   status,
+	}
+	if index >= 0 {
+		(*items)[index] = group
+		return
+	}
+	*items = append(*items, group)
+}
+
+func markToolGroupRunning(items *[]transcriptItem, call tools.Call) {
+	index := findToolGroup(*items, call.ID)
+	if index < 0 {
+		upsertToolGroup(items, call, "running")
+		return
+	}
+	item := (*items)[index]
+	item.Meta = "running"
+	item.Text = renderToolGroup("running", extractToolArgs(item.Text), extractToolOutput(item.Text), strings.Contains(item.Text, "status: error"))
+	(*items)[index] = item
+}
+
+func upsertToolResult(items *[]transcriptItem, response conversation.ToolResponseContent) {
+	index := findToolGroup(*items, response.ID)
+	output := joinToolResults(response.Content)
+	status := "completed"
+	if response.IsError {
+		status = "error"
+	}
+	if index < 0 {
+		prefix := "tool"
+		text := renderToolGroup(status, "{}", output, response.IsError)
+		*items = append(*items, transcriptItem{Kind: kindTool, Key: response.ID, Prefix: prefix, Text: text, Meta: status})
+		return
+	}
+	item := (*items)[index]
+	item.Meta = status
+	item.Text = renderToolGroup(status, extractToolArgs(item.Text), output, response.IsError)
+	(*items)[index] = item
+}
+
+func joinToolResults(results []conversation.ToolResult) string {
+	parts := make([]string, 0, len(results))
+	for _, result := range results {
+		if strings.TrimSpace(result.Text) == "" {
+			continue
+		}
+		parts = append(parts, result.Text)
+	}
+	return strings.Join(parts, "\n")
+}
+
+func renderToolGroup(status string, args string, output string, isError bool) string {
+	lines := []string{fmt.Sprintf("status: %s", status)}
+	if args == "" {
+		args = "{}"
+	}
+	lines = append(lines, "args: "+args)
+	if strings.TrimSpace(output) != "" {
+		label := "output:"
+		if isError {
+			label = "error:"
+		}
+		lines = append(lines, label, output)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func findToolGroup(items []transcriptItem, callID string) int {
+	for i := len(items) - 1; i >= 0; i-- {
+		if items[i].Key == callID {
+			return i
+		}
+	}
+	return -1
+}
+
+func extractToolArgs(text string) string {
+	for _, line := range strings.Split(text, "\n") {
+		if strings.HasPrefix(line, "args: ") {
+			return strings.TrimPrefix(line, "args: ")
+		}
+	}
+	return "{}"
+}
+
+func extractToolOutput(text string) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if line == "output:" || line == "error:" {
+			return strings.Join(lines[i+1:], "\n")
+		}
+	}
+	return ""
 }
 
 func compactArgs(raw json.RawMessage) string {

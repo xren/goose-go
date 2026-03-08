@@ -1,6 +1,10 @@
 package app
 
-import "strings"
+import (
+	"strings"
+
+	"goose-go/internal/models"
+)
 
 type LocalCommandResult struct {
 	Name   string
@@ -8,6 +12,17 @@ type LocalCommandResult struct {
 }
 
 func LocalCommand(prompt string, providerName string, modelName string) (*LocalCommandResult, bool) {
+	providerName = strings.TrimSpace(providerName)
+	modelName = strings.TrimSpace(modelName)
+	if providerName == "" {
+		providerName = defaultProviderName
+	}
+	if modelName == "" {
+		if _, spec, err := models.ResolveSelection(providerName, ""); err == nil {
+			modelName = string(spec.ID)
+		}
+	}
+
 	trimmed := strings.TrimSpace(prompt)
 	switch trimmed {
 	case "/model":

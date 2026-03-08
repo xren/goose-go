@@ -142,43 +142,31 @@ go run ./cmd/goose-go tui
 go run ./cmd/goose-go tui --session <session-id>
 ```
 
-Inside the TUI, `/model` is also handled locally and reports the configured provider/model without starting a run.
-
-Press `Ctrl-C` during `goose-go run` to cancel the active run cleanly. The current persisted session state is kept and the CLI renders the transcript captured so far.
-Each `goose-go run` also writes a per-session JSONL trace under `.goose-go/traces/` by default.
-The TUI uses the same runtime/session path and renders from the same live event stream.
+Inside the TUI, `/model` opens the registry-backed model picker, `/sessions` opens the recent-session picker, `/session` reports current session metadata, `/new` resets to a fresh session state, and `/help` lists the local commands.
+`goose-go run` cancels cleanly on `Ctrl-C`, writes per-session JSONL traces under `.goose-go/traces/`, and shares the same runtime/session path as the TUI.
 
 ## TUI Manual Test Runbook
-
-Use this sequence to manually validate the Stage 1 TUI:
 
 1. Start the TUI:
 ```sh
 go run ./cmd/goose-go tui
 ```
-Verify:
-- the Bubble Tea screen opens
-- header shows `session: new`
-- status starts as `idle`
+- the Bubble Tea screen opens with `session: new` and `status: idle`
 
 2. Submit a simple prompt:
 ```text
 Reply with the single word: pong
 ```
-Verify:
-- status moves through `starting` to `running`
-- a session id appears
-- the user message is appended
-- the assistant response streams into the transcript
-- status ends at `completed`
+- status moves through `starting` to `running` to `completed`
+- a session id appears and the response streams into the transcript
 
 3. Exercise tool activity:
 ```text
 Use the shell tool to run 'pwd' and explain the result.
 ```
 Verify:
-- transcript shows `assistant requested tool ...`
-- transcript shows a `tool[...]` result line
+- transcript shows one grouped `tool[...]` block
+- the block includes args, status, and final output
 - final assistant response appears after the tool result
 
 4. Exercise interrupt:
@@ -204,7 +192,6 @@ Verify:
 ls .goose-go/traces
 jq . .goose-go/traces/<session-id>.jsonl
 ```
-Verify:
 - the TUI run produced the same normalized runtime event trace as `goose-go run`
 
 7. Exercise approval in the TUI:
@@ -215,6 +202,34 @@ Verify:
 - an approval panel opens inside the TUI by default for shell execution
 - `a` or `y` approves and continues the run
 - `d` or `n` denies and keeps the run inside the TUI
+
+8. Exercise model selection in the TUI:
+```text
+/model
+```
+Verify:
+- a model picker opens with the current model preselected
+- unavailable models remain visible with a reason
+- pressing `Enter` on an available model updates the active runtime selection
+
+9. Exercise session selection in the TUI:
+```text
+/sessions
+```
+Or press `Ctrl-R`.
+- a recent-session picker opens inside the TUI
+- selecting a session replays its transcript
+- the resumed session adopts its persisted provider/model through the shared runtime path
+
+10. Exercise the local command surface in the TUI:
+```text
+/help
+/session
+/new
+```
+- `/help` lists the local commands
+- `/session` reports current session metadata without calling the model
+- `/new` clears the active transcript into a fresh interactive session state
 
 ## How A Run Works
 

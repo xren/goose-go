@@ -13,6 +13,7 @@ import (
 	"goose-go/internal/agent"
 	"goose-go/internal/app"
 	"goose-go/internal/conversation"
+	"goose-go/internal/models"
 	"goose-go/internal/session"
 	"goose-go/internal/tools"
 )
@@ -23,6 +24,8 @@ type fakeRuntime struct {
 	loadErr            error
 	replay             session.Session
 	replayErr          error
+	sessionSummaries   []session.Summary
+	sessionSummaryErr  error
 	trace              *fakeTraceWriter
 	traceErr           error
 	streamEvents       []agent.Event
@@ -31,6 +34,14 @@ type fakeRuntime struct {
 	pendingApprovalErr error
 	resolveEvents      []agent.Event
 	resolveErr         error
+	availableModels    []models.Availability
+	availableModelsErr error
+	setSelectionErr    error
+	providerName       string
+	modelName          string
+	lastSetProvider    string
+	lastSetModel       string
+	lastSetSessionID   string
 }
 
 type fakeTraceWriter struct {
@@ -50,6 +61,13 @@ func (f *fakeRuntime) ReplayConversation(context.Context, string) (session.Sessi
 		return f.replay, f.replayErr
 	}
 	return f.replay, nil
+}
+
+func (f *fakeRuntime) ListSessions(context.Context) ([]session.Summary, error) {
+	if f.sessionSummaryErr != nil {
+		return nil, f.sessionSummaryErr
+	}
+	return f.sessionSummaries, nil
 }
 
 func (f *fakeRuntime) OpenTraceWriter(string) (app.EventRecorder, error) {
@@ -101,7 +119,34 @@ func (f *fakeRuntime) WorkingDir() string {
 }
 
 func (f *fakeRuntime) ProviderModel() (string, string) {
-	return "openai-codex", "gpt-5-codex"
+	providerName := f.providerName
+	modelName := f.modelName
+	if providerName == "" {
+		providerName = "openai-codex"
+	}
+	if modelName == "" {
+		modelName = "gpt-5-codex"
+	}
+	return providerName, modelName
+}
+
+func (f *fakeRuntime) ListAvailableModels(context.Context) ([]models.Availability, error) {
+	if f.availableModelsErr != nil {
+		return nil, f.availableModelsErr
+	}
+	return f.availableModels, nil
+}
+
+func (f *fakeRuntime) SetSelection(_ context.Context, provider string, model string, sessionID string) error {
+	if f.setSelectionErr != nil {
+		return f.setSelectionErr
+	}
+	f.providerName = provider
+	f.modelName = model
+	f.lastSetProvider = provider
+	f.lastSetModel = model
+	f.lastSetSessionID = sessionID
+	return nil
 }
 
 func (f *fakeTraceWriter) Write(event agent.Event) error {
@@ -124,20 +169,20 @@ func TestBuildTranscriptFromConversation(t *testing.T) {
 	}}
 
 	items := buildTranscriptFromConversation(conv)
-	if len(items) != 4 {
-		t.Fatalf("expected 4 transcript items, got %d", len(items))
+	if len(items) != 3 {
+		t.Fatalf("expected 3 transcript items, got %d", len(items))
 	}
 	if items[0].Prefix != "user" || items[0].Text != "hello" {
 		t.Fatalf("unexpected first item: %#v", items[0])
 	}
-	if items[1].Prefix != "assistant requested tool" {
-		t.Fatalf("unexpected tool request item: %#v", items[1])
+	if items[1].Prefix != "tool[shell]" {
+		t.Fatalf("unexpected tool group item: %#v", items[1])
 	}
-	if items[2].Prefix != "tool" || items[2].Text != "/tmp/work" {
-		t.Fatalf("unexpected tool response item: %#v", items[2])
+	if !strings.Contains(items[1].Text, "status: completed") || !strings.Contains(items[1].Text, "/tmp/work") {
+		t.Fatalf("unexpected tool group text: %#v", items[1])
 	}
-	if items[3].Prefix != "assistant" || items[3].Text != "done" {
-		t.Fatalf("unexpected assistant item: %#v", items[3])
+	if items[2].Prefix != "assistant" || items[2].Text != "done" {
+		t.Fatalf("unexpected assistant item: %#v", items[2])
 	}
 }
 
@@ -297,11 +342,8 @@ func TestToolLifecycleAndInterruptUpdateState(t *testing.T) {
 	if m.status != "interrupted" {
 		t.Fatalf("expected interrupted status, got %q", m.status)
 	}
-	if !containsText(m.items, "assistant requested tool", "shell {") {
-		t.Fatalf("expected tool request item, got %#v", m.items)
-	}
-	if !containsText(m.items, "tool[shell]", "/tmp/project") {
-		t.Fatalf("expected tool result item, got %#v", m.items)
+	if !containsText(m.items, "tool[shell]", "status: completed") || !containsText(m.items, "tool[shell]", "/tmp/project") {
+		t.Fatalf("expected grouped tool item, got %#v", m.items)
 	}
 	if !trace.closed {
 		t.Fatal("expected trace to be closed after interruption")
@@ -349,7 +391,7 @@ func TestApprovalKeyApproveStartsContinuation(t *testing.T) {
 	if m.approval.Request != nil {
 		t.Fatalf("expected approval panel to clear, got %#v", m.approval)
 	}
-	if !containsText(m.items, "tool[shell]", "/tmp/project") || !containsText(m.items, "assistant", "done") {
+	if !containsText(m.items, "tool[shell]", "status: completed") || !containsText(m.items, "tool[shell]", "/tmp/project") || !containsText(m.items, "assistant", "done") {
 		t.Fatalf("expected continued transcript, got %#v", m.items)
 	}
 }
@@ -384,7 +426,7 @@ func TestApprovalKeyDenyStartsContinuation(t *testing.T) {
 	if m.status != "completed" {
 		t.Fatalf("expected completed status, got %q", m.status)
 	}
-	if !containsText(m.items, "tool[shell]", "tool execution denied by user") {
+	if !containsText(m.items, "tool[shell]", "status: error") || !containsText(m.items, "tool[shell]", "tool execution denied by user") {
 		t.Fatalf("expected denied tool result in transcript, got %#v", m.items)
 	}
 }
@@ -397,24 +439,163 @@ func TestStartRunCmdReturnsErrorMessage(t *testing.T) {
 	}
 }
 
-func TestEnterModelCommandAppendsLocalTranscript(t *testing.T) {
-	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+func TestEnterModelCommandOpensPicker(t *testing.T) {
+	runtime := &fakeRuntime{
+		providerName: "openai-codex",
+		modelName:    "gpt-5-codex",
+		availableModels: []models.Availability{
+			{Model: models.ModelSpec{Provider: models.ProviderOpenAICodex, ID: models.ModelGPT5Codex, DisplayName: "GPT-5 Codex"}, Available: true},
+			{Model: models.ModelSpec{Provider: models.ProviderOpenAICodex, ID: models.ModelGPT53Codex, DisplayName: "GPT-5.3 Codex"}, Available: true},
+		},
+	}
+	m := newModel(context.Background(), runtime, Options{})
 	m.input.SetValue("/model")
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if cmd == nil {
+		t.Fatal("expected load models command")
+	}
+	updated, _ = m.Update(cmd())
 	m = updated.(model)
 
-	if m.status != "idle" {
-		t.Fatalf("expected idle status after local command, got %q", m.status)
+	if m.status != "select model" {
+		t.Fatalf("expected select model status, got %q", m.status)
 	}
-	if len(m.items) != 2 {
-		t.Fatalf("expected 2 transcript items for local command, got %d", len(m.items))
+	if !m.picker.Open {
+		t.Fatal("expected picker to be open")
 	}
-	if m.items[0].Text != "/model" {
-		t.Fatalf("expected command echo in transcript, got %#v", m.items[0])
+	if m.picker.Selected != 0 {
+		t.Fatalf("expected current model to be preselected, got %d", m.picker.Selected)
 	}
-	if !strings.Contains(m.items[1].Text, "provider: openai-codex") || !strings.Contains(m.items[1].Text, "model: gpt-5-codex") {
-		t.Fatalf("unexpected local command output: %#v", m.items[1])
+	if !strings.Contains(m.View(), "Select model") {
+		t.Fatalf("expected picker in view, got %q", m.View())
+	}
+}
+
+func TestModelPickerSelectsModelAndPersistsSession(t *testing.T) {
+	runtime := &fakeRuntime{
+		providerName: "openai-codex",
+		modelName:    "gpt-5-codex",
+		availableModels: []models.Availability{
+			{Model: models.ModelSpec{Provider: models.ProviderOpenAICodex, ID: models.ModelGPT5Codex, DisplayName: "GPT-5 Codex"}, Available: true},
+			{Model: models.ModelSpec{Provider: models.ProviderOpenAICodex, ID: models.ModelGPT53Codex, DisplayName: "GPT-5.3 Codex"}, Available: true},
+		},
+	}
+	m := newModel(context.Background(), runtime, Options{})
+	m.sessionID = "sess_model"
+	m.picker = modelPickerState{Open: true, Items: runtime.availableModels, Selected: 1}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if cmd == nil {
+		t.Fatal("expected set model command")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(model)
+
+	if m.picker.Open {
+		t.Fatal("expected picker to close after successful model change")
+	}
+	if runtime.lastSetProvider != "openai-codex" || runtime.lastSetModel != string(models.ModelGPT53Codex) {
+		t.Fatalf("unexpected set selection call: provider=%q model=%q", runtime.lastSetProvider, runtime.lastSetModel)
+	}
+	if runtime.lastSetSessionID != "sess_model" {
+		t.Fatalf("expected session id to be persisted, got %q", runtime.lastSetSessionID)
+	}
+	if !containsText(m.items, "system", "selected model: gpt-5.3-codex") {
+		t.Fatalf("expected local selection output in transcript, got %#v", m.items)
+	}
+}
+
+func TestModelPickerUnavailableModelShowsReason(t *testing.T) {
+	runtime := &fakeRuntime{
+		availableModels: []models.Availability{
+			{
+				Model:     models.ModelSpec{Provider: models.ProviderOpenAICodex, ID: models.ModelGPT54Codex, DisplayName: "GPT-5.4"},
+				Available: false,
+				Reason:    "missing Codex auth",
+			},
+		},
+	}
+	m := newModel(context.Background(), runtime, Options{})
+	m.picker = modelPickerState{Open: true, Items: runtime.availableModels}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if cmd != nil {
+		t.Fatal("did not expect set model command for unavailable item")
+	}
+	if m.picker.Err != "missing Codex auth" {
+		t.Fatalf("expected unavailable reason, got %q", m.picker.Err)
+	}
+}
+
+func TestSessionsCommandOpensPicker(t *testing.T) {
+	runtime := &fakeRuntime{
+		sessionSummaries: []session.Summary{
+			{ID: "sess_recent", Name: "Recent session", WorkingDir: "/tmp/project", Provider: "openai-codex", Model: "gpt-5-codex", MessageCount: 3},
+			{ID: "sess_old", Name: "Older session", WorkingDir: "/tmp/old", Provider: "openai-codex", Model: "gpt-5.3-codex", MessageCount: 8},
+		},
+	}
+	m := newModel(context.Background(), runtime, Options{})
+	m.input.SetValue("/sessions")
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if cmd == nil {
+		t.Fatal("expected load sessions command")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(model)
+
+	if !m.sessions.Open {
+		t.Fatal("expected sessions picker to be open")
+	}
+	if m.status != "select session" {
+		t.Fatalf("expected select session status, got %q", m.status)
+	}
+	if !strings.Contains(m.View(), "Recent sessions") {
+		t.Fatalf("expected session picker in view, got %q", m.View())
+	}
+}
+
+func TestSessionPickerLoadsSelectedSession(t *testing.T) {
+	msgTime := time.Now().UTC()
+	runtime := &fakeRuntime{
+		sessionSummaries: []session.Summary{
+			{ID: "sess_a", Name: "A", WorkingDir: "/tmp/a", Provider: "openai-codex", Model: "gpt-5-codex", MessageCount: 1},
+			{ID: "sess_b", Name: "B", WorkingDir: "/tmp/b", Provider: "openai-codex", Model: "gpt-5.3-codex", MessageCount: 2},
+		},
+		replay: session.Session{
+			ID:         "sess_b",
+			WorkingDir: "/tmp/b",
+			Provider:   "openai-codex",
+			Model:      "gpt-5.3-codex",
+			Conversation: conversation.Conversation{Messages: []conversation.Message{
+				{ID: "m1", Role: conversation.RoleUser, CreatedAt: msgTime, Content: []conversation.Content{conversation.Text("resume me")}},
+			}},
+		},
+	}
+	m := newModel(context.Background(), runtime, Options{})
+	m.sessions = sessionPickerState{Open: true, Items: runtime.sessionSummaries, Selected: 1}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if cmd == nil {
+		t.Fatal("expected load selected session command")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(model)
+
+	if m.sessions.Open {
+		t.Fatal("expected sessions picker to close after load")
+	}
+	if m.sessionID != "sess_b" {
+		t.Fatalf("expected session id sess_b, got %q", m.sessionID)
+	}
+	if !containsText(m.items, "user", "resume me") {
+		t.Fatalf("expected replayed transcript, got %#v", m.items)
 	}
 }
 

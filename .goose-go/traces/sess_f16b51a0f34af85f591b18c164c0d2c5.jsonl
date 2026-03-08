@@ -1,0 +1,59 @@
+{"recorded_at":"2026-03-08T22:35:24.859821Z","type":"run_started","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5"}
+{"recorded_at":"2026-03-08T22:35:24.861527Z","type":"turn_started","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1}
+{"recorded_at":"2026-03-08T22:35:24.863011Z","type":"user_message_persisted","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","message":{"id":"msg_ed6ac4408272fc50","role":"user","created_at":"2026-03-08T22:35:24.859492Z","content":[{"type":"text","text":{"text":"what model are you"}}]}}
+{"recorded_at":"2026-03-08T22:35:25.921537Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":"I"}
+{"recorded_at":"2026-03-08T22:35:25.941725Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":"’m"}
+{"recorded_at":"2026-03-08T22:35:25.960544Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" an"}
+{"recorded_at":"2026-03-08T22:35:25.98031Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" AI"}
+{"recorded_at":"2026-03-08T22:35:25.981025Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" assistant"}
+{"recorded_at":"2026-03-08T22:35:26.00046Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" running"}
+{"recorded_at":"2026-03-08T22:35:26.016432Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" via"}
+{"recorded_at":"2026-03-08T22:35:26.036021Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" the"}
+{"recorded_at":"2026-03-08T22:35:26.062319Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" API"}
+{"recorded_at":"2026-03-08T22:35:26.111109Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" in"}
+{"recorded_at":"2026-03-08T22:35:26.112295Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" environment"}
+{"recorded_at":"2026-03-08T22:35:26.113861Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" this"}
+{"recorded_at":"2026-03-08T22:35:26.135021Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":"."}
+{"recorded_at":"2026-03-08T22:35:26.151632Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" I"}
+{"recorded_at":"2026-03-08T22:35:26.176994Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" don"}
+{"recorded_at":"2026-03-08T22:35:26.196263Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" have"}
+{"recorded_at":"2026-03-08T22:35:26.196971Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":"’t"}
+{"recorded_at":"2026-03-08T22:35:26.219179Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" a"}
+{"recorded_at":"2026-03-08T22:35:26.238555Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" reliable"}
+{"recorded_at":"2026-03-08T22:35:26.257526Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" way"}
+{"recorded_at":"2026-03-08T22:35:26.277923Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" to"}
+{"recorded_at":"2026-03-08T22:35:26.29613Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" see"}
+{"recorded_at":"2026-03-08T22:35:26.314966Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" the"}
+{"recorded_at":"2026-03-08T22:35:26.333701Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" exact"}
+{"recorded_at":"2026-03-08T22:35:26.353763Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" model"}
+{"recorded_at":"2026-03-08T22:35:26.396516Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" from"}
+{"recorded_at":"2026-03-08T22:35:26.397135Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" identifier"}
+{"recorded_at":"2026-03-08T22:35:26.46052Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" chat"}
+{"recorded_at":"2026-03-08T22:35:26.461314Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" inside"}
+{"recorded_at":"2026-03-08T22:35:26.461988Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" the"}
+{"recorded_at":"2026-03-08T22:35:26.52688Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" the"}
+{"recorded_at":"2026-03-08T22:35:26.527377Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" unless"}
+{"recorded_at":"2026-03-08T22:35:26.595071Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" host"}
+{"recorded_at":"2026-03-08T22:35:26.667846Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" application"}
+{"recorded_at":"2026-03-08T22:35:26.669249Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" exposes"}
+{"recorded_at":"2026-03-08T22:35:26.671276Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" it"}
+{"recorded_at":"2026-03-08T22:35:26.676288Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":"If"}
+{"recorded_at":"2026-03-08T22:35:26.676815Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":".\n\n"}
+{"recorded_at":"2026-03-08T22:35:26.750773Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" want"}
+{"recorded_at":"2026-03-08T22:35:26.751997Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" you"}
+{"recorded_at":"2026-03-08T22:35:26.752902Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":","}
+{"recorded_at":"2026-03-08T22:35:26.753746Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" can"}
+{"recorded_at":"2026-03-08T22:35:26.75427Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" I"}
+{"recorded_at":"2026-03-08T22:35:26.807077Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" help"}
+{"recorded_at":"2026-03-08T22:35:26.808176Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" you"}
+{"recorded_at":"2026-03-08T22:35:26.881804Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" figure"}
+{"recorded_at":"2026-03-08T22:35:26.882875Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" it"}
+{"recorded_at":"2026-03-08T22:35:26.884217Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" from"}
+{"recorded_at":"2026-03-08T22:35:26.885065Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" your"}
+{"recorded_at":"2026-03-08T22:35:26.88557Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" out"}
+{"recorded_at":"2026-03-08T22:35:26.95802Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":"/client"}
+{"recorded_at":"2026-03-08T22:35:26.959011Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" API"}
+{"recorded_at":"2026-03-08T22:35:26.961157Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":"."}
+{"recorded_at":"2026-03-08T22:35:26.961631Z","type":"provider_text_delta","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"delta":" configuration"}
+{"recorded_at":"2026-03-08T22:35:27.015319Z","type":"assistant_message_complete","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","turn":1,"message":{"id":"msg_698f0d54ddf18d00","role":"assistant","created_at":"2026-03-08T22:35:27.01522Z","content":[{"type":"text","text":{"text":"I’m an AI assistant running via the API in this environment. I don’t have a reliable way to see the exact model identifier from inside the chat unless the host application exposes it.\n\nIf you want, I can help you figure it out from your API/client configuration."}}]}}
+{"recorded_at":"2026-03-08T22:35:27.017674Z","type":"run_completed","session_id":"sess_f16b51a0f34af85f591b18c164c0d2c5","result":{"status":"completed","session":{"id":"sess_f16b51a0f34af85f591b18c164c0d2c5","name":"what model are you","working_dir":"/Users/rex/projects/goose-go","provider":"openai-codex","model":"gpt-5.4","type":"terminal","created_at":1773009324,"updated_at":1773009327,"message_count":2,"conversation":{"messages":[{"id":"msg_ed6ac4408272fc50","role":"user","created_at":"2026-03-08T22:35:24.859492Z","content":[{"type":"text","text":{"text":"what model are you"}}]},{"id":"msg_698f0d54ddf18d00","role":"assistant","created_at":"2026-03-08T22:35:27.01522Z","content":[{"type":"text","text":{"text":"I’m an AI assistant running via the API in this environment. I don’t have a reliable way to see the exact model identifier from inside the chat unless the host application exposes it.\n\nIf you want, I can help you figure it out from your API/client configuration."}}]}]}},"turns":1}}

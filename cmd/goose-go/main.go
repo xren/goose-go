@@ -34,6 +34,8 @@ func run(args []string) error {
 		fs.SetOutput(os.Stderr)
 		approve := fs.Bool("approve", true, "prompt before each shell execution")
 		debugProvider := fs.Bool("debug-provider", false, "print translated provider request and raw SSE events")
+		providerName := fs.String("provider", "", "provider id")
+		modelName := fs.String("model", "", "model id")
 		sessionID := fs.String("session", "", "resume an existing session by id")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
@@ -47,8 +49,20 @@ func run(args []string) error {
 			RequireApproval: true,
 			Approve:         *approve,
 			DebugProvider:   *debugProvider,
+			Provider:        *providerName,
+			Model:           *modelName,
 			SessionID:       *sessionID,
 		})
+	case "models":
+		fs := flag.NewFlagSet("models", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		providerName := fs.String("provider", "", "provider id")
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		ctx, cancel := app.RunAgentContext()
+		defer cancel()
+		return app.ListModels(ctx, os.Stdout, app.RunOptions{Provider: *providerName})
 	case "sessions":
 		fs := flag.NewFlagSet("sessions", flag.ContinueOnError)
 		fs.SetOutput(os.Stderr)
@@ -76,13 +90,19 @@ func run(args []string) error {
 	case "tui":
 		fs := flag.NewFlagSet("tui", flag.ContinueOnError)
 		fs.SetOutput(os.Stderr)
+		providerName := fs.String("provider", "", "provider id")
+		modelName := fs.String("model", "", "model id")
 		sessionID := fs.String("session", "", "resume an existing session by id")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
 		ctx, cancel := app.RunAgentContext()
 		defer cancel()
-		runtime, err := app.OpenRuntime(os.Stdin, os.Stdout, app.RunOptions{RequireApproval: true})
+		runtime, err := app.OpenRuntime(os.Stdin, os.Stdout, app.RunOptions{
+			RequireApproval: true,
+			Provider:        *providerName,
+			Model:           *modelName,
+		})
 		if err != nil {
 			return err
 		}

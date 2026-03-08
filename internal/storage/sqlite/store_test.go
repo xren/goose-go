@@ -18,6 +18,8 @@ func TestStoreSessionLifecycle(t *testing.T) {
 	created, err := store.CreateSession(ctx, session.CreateParams{
 		Name:       "test",
 		WorkingDir: t.TempDir(),
+		Provider:   "openai-codex",
+		Model:      "gpt-5-codex",
 		Type:       session.TypeUser,
 	})
 	if err != nil {
@@ -31,6 +33,9 @@ func TestStoreSessionLifecycle(t *testing.T) {
 
 	if loaded.Name != "test" {
 		t.Fatalf("expected name test, got %q", loaded.Name)
+	}
+	if loaded.Provider != "openai-codex" || loaded.Model != "gpt-5-codex" {
+		t.Fatalf("expected persisted provider/model, got provider=%q model=%q", loaded.Provider, loaded.Model)
 	}
 
 	msg := conversation.NewMessage(
@@ -97,6 +102,8 @@ func TestStoreAddMessageConcurrent(t *testing.T) {
 	created, err := store.CreateSession(ctx, session.CreateParams{
 		Name:       "concurrent",
 		WorkingDir: t.TempDir(),
+		Provider:   "openai-codex",
+		Model:      "gpt-5-codex",
 		Type:       session.TypeUser,
 	})
 	if err != nil {
@@ -156,8 +163,8 @@ func TestStoreAppliesSchemaVersion(t *testing.T) {
 		t.Fatalf("read user version: %v", err)
 	}
 
-	if version != 2 {
-		t.Fatalf("expected schema version 2, got %d", version)
+	if version != 3 {
+		t.Fatalf("expected schema version 3, got %d", version)
 	}
 }
 
@@ -168,6 +175,8 @@ func TestStoreCompactionLifecycle(t *testing.T) {
 	created, err := store.CreateSession(ctx, session.CreateParams{
 		Name:       "compaction",
 		WorkingDir: t.TempDir(),
+		Provider:   "openai-codex",
+		Model:      "gpt-5-codex",
 		Type:       session.TypeTerminal,
 	})
 	if err != nil {
@@ -218,6 +227,8 @@ func TestStoreLatestCompactionNotFound(t *testing.T) {
 	created, err := store.CreateSession(ctx, session.CreateParams{
 		Name:       "no-compaction",
 		WorkingDir: t.TempDir(),
+		Provider:   "openai-codex",
+		Model:      "gpt-5-codex",
 		Type:       session.TypeTerminal,
 	})
 	if err != nil {
@@ -236,6 +247,8 @@ func TestStoreCompactionPreservesConversationHistory(t *testing.T) {
 	created, err := store.CreateSession(ctx, session.CreateParams{
 		Name:       "history",
 		WorkingDir: t.TempDir(),
+		Provider:   "openai-codex",
+		Model:      "gpt-5-codex",
 		Type:       session.TypeTerminal,
 	})
 	if err != nil {
@@ -281,4 +294,28 @@ func newTestStore(t *testing.T) *Store {
 		_ = store.Close()
 	})
 	return store
+}
+
+func TestStoreUpdateSessionSelection(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	created, err := store.CreateSession(ctx, session.CreateParams{
+		Name:       "selection",
+		WorkingDir: t.TempDir(),
+		Provider:   "openai-codex",
+		Model:      "gpt-5-codex",
+		Type:       session.TypeTerminal,
+	})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	updated, err := store.UpdateSessionSelection(ctx, created.ID, "openai-codex", "gpt-5.3-codex")
+	if err != nil {
+		t.Fatalf("update selection: %v", err)
+	}
+	if updated.Model != "gpt-5.3-codex" {
+		t.Fatalf("expected updated model, got %q", updated.Model)
+	}
 }

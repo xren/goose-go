@@ -35,6 +35,8 @@ type RunOptions struct {
 	RequireApproval bool
 	Approve         bool
 	DebugProvider   bool
+	Provider        string
+	Model           string
 	WorkingDir      string
 	DBPath          string
 	TraceDir        string
@@ -47,7 +49,7 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 		return errors.New("prompt is required")
 	}
 
-	if cmd, ok := LocalCommand(prompt, defaultProviderName, defaultModelName); ok {
+	if cmd, ok := LocalCommand(prompt, opts.Provider, opts.Model); ok {
 		_, err := fmt.Fprintf(out, "system> /%s\nsystem> %s\n", cmd.Name, strings.ReplaceAll(cmd.Output, "\n", "\nsystem> "))
 		if err != nil {
 			return fmt.Errorf("write local command output: %w", err)
@@ -78,7 +80,7 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 
 	stream, err := runtime.Agent().ReplyStream(ctx, record.ID, prompt)
 	if err != nil {
-		return diagnoseRunError("openai-codex", err, opts.DebugProvider)
+		return diagnoseRunError(providerForDiagnostic(runtime), err, opts.DebugProvider)
 	}
 
 	renderer := newEventRenderer(out)
@@ -113,7 +115,7 @@ func RunAgent(ctx context.Context, in io.Reader, out io.Writer, prompt string, o
 		return finalErr
 	}
 	if finalErr != nil {
-		return diagnoseRunError("openai-codex", finalErr, opts.DebugProvider)
+		return diagnoseRunError(providerForDiagnostic(runtime), finalErr, opts.DebugProvider)
 	}
 	return nil
 }
@@ -376,11 +378,13 @@ func renderTextBlocks(out io.Writer, prefix string, content []conversation.Conte
 	return nil
 }
 
-func loadOrCreateSession(ctx context.Context, store session.Store, prompt string, workingDir string, sessionID string) (session.Session, int, error) {
+func loadOrCreateSession(ctx context.Context, store session.Store, prompt string, workingDir string, providerName string, modelName string, sessionID string) (session.Session, int, error) {
 	if sessionID == "" {
 		record, err := store.CreateSession(ctx, session.CreateParams{
 			Name:       sessionName(prompt),
 			WorkingDir: workingDir,
+			Provider:   providerName,
+			Model:      modelName,
 			Type:       session.TypeTerminal,
 		})
 		if err != nil {
@@ -428,4 +432,15 @@ func compactArgs(raw json.RawMessage) string {
 		return string(raw)
 	}
 	return string(data)
+}
+
+func providerForDiagnostic(runtime *Runtime) string {
+	if runtime == nil {
+		return defaultProviderName
+	}
+	providerName, _ := runtime.ProviderModel()
+	if providerName == "" {
+		return defaultProviderName
+	}
+	return providerName
 }

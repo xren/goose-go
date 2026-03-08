@@ -32,6 +32,7 @@ in_progress
 - slash commands or a command palette for session actions
 - compaction visibility beyond simple transcript notices
 - model registry and model-selection UI
+- styling and layout standardization for panels, transcript hierarchy, and footer surfaces
 - stronger TUI reducer and smoke coverage for the richer flows
 
 ## Scope Out
@@ -39,7 +40,7 @@ in_progress
 - server or desktop surfaces
 - branch/session tree UX
 - plugin-defined UI panels
-- advanced theme system
+- advanced theme system beyond a narrow token-based foundation
 - non-terminal frontends
 - broad `pi-mono` feature parity
 
@@ -59,7 +60,8 @@ That means Phase 0 is a runtime integration phase, not a styling phase.
 2. session picker / recent sessions
 3. grouped tool rendering
 4. command surface
-5. navigation and status polish
+5. styling and layout standardization
+6. navigation and status polish
 
 ## Proposed Package and Surface Changes
 
@@ -157,28 +159,26 @@ Acceptance:
 - resumed sessions preserve provider/model choice deterministically
 
 ### Phase 3: Session entry UX
+Status: done
 
-Tasks:
+Implemented:
 
-- add a recent-session picker or home screen
-- support:
-  - new session
-  - continue most recent
-  - open selected session
-- use existing session APIs, not raw SQLite queries
+- `/sessions` now opens a recent-session picker inside the TUI
+- `Ctrl-R` opens the same picker as a keyboard shortcut
+- selecting a session replays persisted conversation and adopts its persisted provider/model through the runtime boundary
 
 Acceptance:
 
 - users no longer need to copy session ids to resume work in the TUI
 
 ### Phase 4: Grouped tool rendering
+Status: done
 
-Tasks:
+Implemented:
 
-- group tool request + execution + result into a single logical block
-- allow collapse / expand
-- distinguish success vs error visually
-- separate tool/system notices from ordinary transcript text more clearly
+- tool lifecycle is now grouped into one transcript block per tool call in the TUI
+- grouped blocks preserve tool args, running/completed/error state, and final output
+- replayed conversations rebuild the same grouped tool blocks instead of flattening request/result lines
 
 Acceptance:
 
@@ -186,26 +186,46 @@ Acceptance:
 
 ### Phase 5: Command surface
 
+Status: in_progress
+
 Tasks:
 
-- add slash commands or a command palette for:
-  - new
-  - recent sessions
-  - reopen current session state if needed
-  - maybe copy/export later
+- add slash commands or a command palette for common session actions
 - keep command handling at the TUI/app layer
 - do not couple command parsing to provider or agent logic
+
+Implemented so far:
+
+- `/help` now lists the current local TUI command surface
+- `/session` reports current session id, cwd, provider, and model
+- `/new` resets the interactive surface to a fresh session state
+- `/model` and `/sessions` remain local entry points for their pickers
 
 Acceptance:
 
 - common session actions are available without leaving the TUI
 
 Current note:
+- approval, model selection, recent-session picking, grouped tool blocks, and the first local command set are now in place
+- remaining Stage 2 work is about making those surfaces feel like one interface system rather than independent widgets
 
-- the first local slash command, `/model`, is now implemented in both `goose-go run` and `goose-go tui`
-- the next step is to replace the static reporter behavior with registry-backed selection
-- approval is now handled directly in the TUI through the approval panel and continuation stream
-- shell execution now requires approval by default on the TUI surface
+### Phase 6: Styling and layout standardization
+
+System of record:
+
+- [07e-tui-styling-and-layout.md](/Users/rex/projects/goose-go/progress/07e-tui-styling-and-layout.md)
+- [07f-tui-theme-system.md](/Users/rex/projects/goose-go/progress/07f-tui-theme-system.md)
+
+Tasks:
+
+- standardize panel rendering across approval, model picker, and session picker
+- improve transcript hierarchy for user, assistant, system, and grouped tool blocks
+- make footer and status surfaces more intentionally structured
+- introduce a token-based theme direction instead of continuing with scattered ad hoc styling
+
+Acceptance:
+
+- the TUI looks like one interface system rather than a collection of separate widgets
 
 ## Approval Architecture Notes
 
@@ -238,6 +258,10 @@ Do not:
 - depend on model self-identification for runtime truth
 - keep runtime behavior pinned to hard-coded `gpt-5-codex` constants once this phase starts
 
+## Styling Notes
+
+`pi-mono`'s styling strength comes from stable layout slots, reusable selector surfaces, and semantic theme tokens. `goose-go` should copy that structure before it chases broader feature parity or cosmetic flourishes.
+
 ## Session Picker Architecture Notes
 
 Use only the session abstraction:
@@ -252,15 +276,7 @@ Do not:
 
 ## Tool Rendering Notes
 
-Stage 1 renders tool activity as flat transcript lines. Stage 2 should promote tool activity to first-class grouped UI blocks.
-
-Recommended grouped block shape:
-
-- header: tool name + status
-- args summary
-- result summary or expanded output
-
-Keep grouped tool state reducer-driven. Do not reparse rendered strings.
+Keep grouped tool state reducer-driven. Do not reparse rendered strings, and do not fall back to flat transcript lines for replayed sessions.
 
 ## Testing Strategy
 
