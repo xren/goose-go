@@ -14,11 +14,15 @@ none
 
 ## Scope In
 
+- native `goose-go` login
+- keyring-backed Codex credential support
+- websocket transport for the Codex provider
+- generic OpenAI API-key provider
 - recipes beyond minimal support
 - remote/stdin MCP transport breadth
 - server parity
 - desktop parity
-- extra providers
+- extra providers beyond the Codex-first path
 - subagents
 - dictation and local inference
 - telemetry breadth
@@ -29,6 +33,10 @@ none
 
 ## Checklist
 
+- [ ] Decide whether to add native `goose-go` login instead of reusing existing Codex auth state
+- [ ] Evaluate keyring-backed Codex credential support
+- [ ] Evaluate websocket transport for the Codex provider
+- [ ] Evaluate generic OpenAI API-key provider support after the Codex-first slice is stable
 - [ ] Revisit recipes once terminal core is stable
 - [ ] Evaluate MCP transport support after in-process tools are solid
 - [ ] Decide whether server parity is worth adding
@@ -49,3 +57,5 @@ none
 ## Notes / Findings
 
 - This file is explicitly non-v1.
+- V1 intentionally reuses existing `codex login` state from `~/.codex/auth.json`.
+- Broader provider and auth surface area is intentionally deferred.
