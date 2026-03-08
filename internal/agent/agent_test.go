@@ -301,6 +301,109 @@ func TestReplyStreamApprovalRequired(t *testing.T) {
 	}
 }
 
+func TestReplyThresholdCompactionUsesCompactedContext(t *testing.T) {
+	var requests []provider.Request
+	agent, store, record := newTestAgent(t, scriptedProvider{
+		respond: func(req provider.Request) []provider.Event {
+			requests = append(requests, req)
+			msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("done"))
+			return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+		},
+	}, ApprovalModeAuto, nil)
+	agent.config.Model.ContextWindow = 120
+	agent.config.Compaction.ReserveTokens = 20
+	agent.config.Compaction.KeepRecentTokens = 20
+
+	for i := 0; i < 6; i++ {
+		if _, err := store.AddMessage(context.Background(), record.ID, conversation.NewMessage(
+			conversation.RoleUser,
+			conversation.Text(strings.Repeat("history ", 20)),
+		)); err != nil {
+			t.Fatalf("seed history: %v", err)
+		}
+	}
+
+	result, err := agent.Reply(context.Background(), record.ID, "continue")
+	if err != nil {
+		t.Fatalf("reply: %v", err)
+	}
+	if result.Status != StatusCompleted {
+		t.Fatalf("expected completed status, got %q", result.Status)
+	}
+
+	latest, err := store.GetLatestCompaction(context.Background(), record.ID)
+	if err != nil {
+		t.Fatalf("get latest compaction: %v", err)
+	}
+	if latest.Trigger != session.CompactionTriggerThreshold {
+		t.Fatalf("expected threshold compaction, got %q", latest.Trigger)
+	}
+
+	if len(requests) != 2 {
+		t.Fatalf("expected one summarizer request plus one provider request after threshold compaction, got %d", len(requests))
+	}
+	if len(requests[1].Messages) == 0 {
+		t.Fatal("expected provider messages")
+	}
+	first := requests[1].Messages[0]
+	if first.Role != conversation.RoleAssistant {
+		t.Fatalf("expected compacted summary assistant message first, got %q", first.Role)
+	}
+	if first.Content[0].Text == nil || !strings.Contains(first.Content[0].Text.Text, "Compacted session summary") {
+		t.Fatalf("expected synthetic summary message, got %#v", first.Content)
+	}
+}
+
+func TestReplyOverflowRecoveryCompactsAndRetries(t *testing.T) {
+	var requests []provider.Request
+	agent, store, record := newTestAgent(t, scriptedProvider{
+		respond: func(req provider.Request) []provider.Event {
+			requests = append(requests, req)
+			if len(requests) == 1 {
+				return []provider.Event{{Type: provider.EventTypeError, Err: errors.New("context window exceeded")}}
+			}
+			msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("recovered"))
+			return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+		},
+	}, ApprovalModeAuto, nil)
+	agent.config.Model.ContextWindow = 1000
+	agent.config.Compaction.ReserveTokens = 20
+	agent.config.Compaction.KeepRecentTokens = 20
+
+	for i := 0; i < 4; i++ {
+		if _, err := store.AddMessage(context.Background(), record.ID, conversation.NewMessage(
+			conversation.RoleUser,
+			conversation.Text(strings.Repeat("history ", 20)),
+		)); err != nil {
+			t.Fatalf("seed history: %v", err)
+		}
+	}
+
+	result, err := agent.Reply(context.Background(), record.ID, "continue")
+	if err != nil {
+		t.Fatalf("reply: %v", err)
+	}
+	if result.Status != StatusCompleted {
+		t.Fatalf("expected completed status, got %q", result.Status)
+	}
+	if len(requests) != 3 {
+		t.Fatalf("expected overflow request, summarizer request, and retry, got %d requests", len(requests))
+	}
+
+	latest, err := store.GetLatestCompaction(context.Background(), record.ID)
+	if err != nil {
+		t.Fatalf("get latest compaction: %v", err)
+	}
+	if latest.Trigger != session.CompactionTriggerOverflow {
+		t.Fatalf("expected overflow compaction, got %q", latest.Trigger)
+	}
+
+	first := requests[2].Messages[0]
+	if first.Role != conversation.RoleAssistant {
+		t.Fatalf("expected compacted summary assistant message first, got %q", first.Role)
+	}
+}
+
 func newTestAgent(t *testing.T, p provider.Provider, mode ApprovalMode, approver Approver) (*Agent, session.Store, session.Session) {
 	t.Helper()
 
@@ -340,8 +443,9 @@ type scriptedProvider struct {
 }
 
 func (s scriptedProvider) streamWithRequest(req provider.Request) (<-chan provider.Event, error) {
-	ch := make(chan provider.Event, len(s.respond(req)))
-	for _, event := range s.respond(req) {
+	events := s.respond(req)
+	ch := make(chan provider.Event, len(events))
+	for _, event := range events {
 		ch <- event
 	}
 	close(ch)

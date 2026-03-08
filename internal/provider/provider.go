@@ -30,6 +30,7 @@ type ToolDefinition struct {
 type ModelConfig struct {
 	Provider        string   `json:"provider"`
 	Model           string   `json:"model"`
+	ContextWindow   int      `json:"context_window,omitempty"`
 	Temperature     *float64 `json:"temperature,omitempty"`
 	MaxOutputTokens int      `json:"max_output_tokens,omitempty"`
 }
@@ -91,6 +92,9 @@ func (m ModelConfig) Validate() error {
 	}
 	if m.Model == "" {
 		return errors.New("model is required")
+	}
+	if m.ContextWindow < 0 {
+		return errors.New("context_window must be >= 0")
 	}
 	if m.Temperature != nil && *m.Temperature < 0 {
 		return errors.New("temperature must be >= 0")

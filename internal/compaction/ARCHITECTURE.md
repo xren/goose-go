@@ -45,7 +45,7 @@ flowchart LR
     H --> I["MessagesToSummarize + KeptMessages"]
     I --> J["SerializeForSummarization"]
     J --> K["Summarizer.Summarize"]
-    K --> L["persist compaction artifact (future step)"]
+    K --> L["persist compaction artifact"]
     L --> M["BuildActiveMessages"]
     M --> N["active provider view = summary + kept messages"]
 ```
@@ -250,14 +250,25 @@ This package is designed around explicit compaction artifacts and reconstructed 
 - resume/replay
 - future TUI rendering
 
-## Next Integration Step
+## Runtime Integration
 
-The next implementation step is agent integration:
+Compaction is now integrated into `internal/agent`.
 
-1. have `internal/agent` call the compaction planner before provider turns
-2. run threshold compaction before normal provider submission
-3. run overflow recovery compaction after context-limit failures
-4. persist compaction artifacts through the session store
+Current runtime behavior:
+
+1. Before each provider turn, the agent reconstructs the active context from the latest compaction artifact plus the persisted conversation.
+2. If the active context estimate exceeds `context_window - reserve_tokens`, the agent runs threshold compaction before sending the next provider request.
+3. If the provider returns a context-length style error, the agent performs one overflow-recovery compaction attempt and retries the provider turn once.
+4. Each successful compaction persists an explicit session compaction artifact and rebuilds the active provider view from that checkpoint.
+5. Compaction lifecycle events are emitted on the live agent event stream and therefore land in CLI rendering and JSONL traces automatically.
+
+## Next Step
+
+The remaining compaction work is evaluation breadth:
+
+1. add eval scenarios for continuation after compaction
+2. add eval scenarios for resumed sessions after prior compaction
+3. refine token-estimation behavior if real provider usage shows drift
 5. emit compaction events into the existing event stream
 
 At that point, `internal/compaction` remains the compaction planning and summarization layer and `internal/agent` remains the orchestration layer.

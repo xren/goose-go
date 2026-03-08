@@ -181,18 +181,21 @@ type traceWriter struct {
 }
 
 type traceRecord struct {
-	RecordedAt time.Time              `json:"recorded_at"`
-	Type       agent.EventType        `json:"type"`
-	SessionID  string                 `json:"session_id,omitempty"`
-	Turn       int                    `json:"turn,omitempty"`
-	Delta      string                 `json:"delta,omitempty"`
-	Message    *conversation.Message  `json:"message,omitempty"`
-	ToolCall   *tools.Call            `json:"tool_call,omitempty"`
-	ToolResult *tools.Result          `json:"tool_result,omitempty"`
-	Approval   *agent.ApprovalRequest `json:"approval_request,omitempty"`
-	Decision   agent.ApprovalDecision `json:"approval_decision,omitempty"`
-	Result     *agent.Result          `json:"result,omitempty"`
-	Error      string                 `json:"error,omitempty"`
+	RecordedAt       time.Time                 `json:"recorded_at"`
+	Type             agent.EventType           `json:"type"`
+	SessionID        string                    `json:"session_id,omitempty"`
+	Turn             int                       `json:"turn,omitempty"`
+	Delta            string                    `json:"delta,omitempty"`
+	Message          *conversation.Message     `json:"message,omitempty"`
+	Compaction       *session.Compaction       `json:"compaction,omitempty"`
+	CompactionReason session.CompactionTrigger `json:"compaction_reason,omitempty"`
+	TokensBefore     int                       `json:"tokens_before,omitempty"`
+	ToolCall         *tools.Call               `json:"tool_call,omitempty"`
+	ToolResult       *tools.Result             `json:"tool_result,omitempty"`
+	Approval         *agent.ApprovalRequest    `json:"approval_request,omitempty"`
+	Decision         agent.ApprovalDecision    `json:"approval_decision,omitempty"`
+	Result           *agent.Result             `json:"result,omitempty"`
+	Error            string                    `json:"error,omitempty"`
 }
 
 func openTraceWriter(traceDir string, sessionID string) (*traceWriter, error) {
@@ -212,17 +215,20 @@ func openTraceWriter(traceDir string, sessionID string) (*traceWriter, error) {
 
 func (w *traceWriter) Write(event agent.Event) error {
 	record := traceRecord{
-		RecordedAt: time.Now().UTC(),
-		Type:       event.Type,
-		SessionID:  event.SessionID,
-		Turn:       event.Turn,
-		Delta:      event.Delta,
-		Message:    event.Message,
-		ToolCall:   event.ToolCall,
-		ToolResult: event.ToolResult,
-		Approval:   event.ApprovalRequest,
-		Decision:   event.ApprovalDecision,
-		Result:     event.Result,
+		RecordedAt:       time.Now().UTC(),
+		Type:             event.Type,
+		SessionID:        event.SessionID,
+		Turn:             event.Turn,
+		Delta:            event.Delta,
+		Message:          event.Message,
+		Compaction:       event.Compaction,
+		CompactionReason: event.CompactionReason,
+		TokensBefore:     event.TokensBefore,
+		ToolCall:         event.ToolCall,
+		ToolResult:       event.ToolResult,
+		Approval:         event.ApprovalRequest,
+		Decision:         event.ApprovalDecision,
+		Result:           event.Result,
 	}
 	if event.Err != nil {
 		record.Error = event.Err.Error()
@@ -309,6 +315,24 @@ func (r *eventRenderer) Render(event agent.Event) error {
 					return fmt.Errorf("write tool response: %w", err)
 				}
 			}
+		}
+	case agent.EventTypeCompactionStarted:
+		if r.assistantLineOpen {
+			if _, err := io.WriteString(r.out, "\n"); err != nil {
+				return fmt.Errorf("terminate assistant line: %w", err)
+			}
+			r.assistantLineOpen = false
+		}
+		if _, err := fmt.Fprintf(r.out, "system> compacting context (%s, %d tokens)\n", event.CompactionReason, event.TokensBefore); err != nil {
+			return fmt.Errorf("write compaction start: %w", err)
+		}
+	case agent.EventTypeCompactionCompleted:
+		if _, err := fmt.Fprintf(r.out, "system> compaction complete (%s)\n", event.CompactionReason); err != nil {
+			return fmt.Errorf("write compaction complete: %w", err)
+		}
+	case agent.EventTypeCompactionFailed:
+		if _, err := fmt.Fprintf(r.out, "system> compaction failed (%s)\n", event.CompactionReason); err != nil {
+			return fmt.Errorf("write compaction failure: %w", err)
 		}
 	case agent.EventTypeRunInterrupted:
 		if r.assistantLineOpen {

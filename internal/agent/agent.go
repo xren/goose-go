@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
+	"goose-go/internal/compaction"
 	"goose-go/internal/conversation"
 	"goose-go/internal/provider"
 	"goose-go/internal/session"
@@ -46,6 +48,7 @@ type Config struct {
 	Model        provider.ModelConfig
 	MaxTurns     int
 	ApprovalMode ApprovalMode
+	Compaction   compaction.Settings
 }
 
 type ApprovalRequest struct {
@@ -80,6 +83,9 @@ func New(store session.Store, p provider.Provider, registry *tools.Registry, con
 	}
 	if config.ApprovalMode == "" {
 		config.ApprovalMode = ApprovalModeAuto
+	}
+	if !config.Compaction.Enabled && config.Compaction.ReserveTokens == 0 && config.Compaction.KeepRecentTokens == 0 {
+		config.Compaction = compaction.DefaultSettings()
 	}
 	if err := config.validate(); err != nil {
 		return nil, err
@@ -149,9 +155,27 @@ func (a *Agent) reply(ctx context.Context, sessionID string, userText string, em
 	for turn := 1; turn <= a.config.MaxTurns; turn++ {
 		emit(Event{Type: EventTypeTurnStarted, SessionID: sessionID, Turn: turn})
 
-		assistantMessage, err := a.runProviderTurn(ctx, record, turn, emit)
+		activeMessages, err := a.prepareActiveMessages(ctx, record, turn, emit)
 		if err != nil {
 			return Result{}, err
+		}
+
+		recoveredFromOverflow := false
+		var assistantMessage conversation.Message
+		for {
+			assistantMessage, err = a.runProviderTurn(ctx, record, activeMessages, turn, emit)
+			if err == nil {
+				break
+			}
+			if !isContextOverflowError(err) || recoveredFromOverflow {
+				return Result{}, err
+			}
+
+			activeMessages, err = a.compactForReason(ctx, record, turn, session.CompactionTriggerOverflow, emit)
+			if err != nil {
+				return Result{}, err
+			}
+			recoveredFromOverflow = true
 		}
 		emit(Event{Type: EventTypeAssistantMessageComplete, SessionID: sessionID, Turn: turn, Message: &assistantMessage})
 
@@ -198,11 +222,11 @@ func (a *Agent) reply(ctx context.Context, sessionID string, userText string, em
 	return Result{Status: StatusCompleted, Session: record, Turns: a.config.MaxTurns}, ErrMaxTurnsExceeded
 }
 
-func (a *Agent) runProviderTurn(ctx context.Context, record session.Session, turn int, emit func(Event)) (conversation.Message, error) {
+func (a *Agent) runProviderTurn(ctx context.Context, record session.Session, messages []conversation.Message, turn int, emit func(Event)) (conversation.Message, error) {
 	stream, err := a.provider.Stream(ctx, provider.Request{
 		SessionID:    record.ID,
 		SystemPrompt: a.config.SystemPrompt,
-		Messages:     record.Conversation.Messages,
+		Messages:     messages,
 		Tools:        toolDefinitions(a.tools.Definitions()),
 		Model:        a.config.Model,
 	})
@@ -281,10 +305,171 @@ func (c Config) validate() error {
 	if err := c.Model.Validate(); err != nil {
 		return fmt.Errorf("model: %w", err)
 	}
+	if err := c.Compaction.Validate(); err != nil {
+		return fmt.Errorf("compaction: %w", err)
+	}
 	if c.MaxTurns <= 0 {
 		return errors.New("max turns must be > 0")
 	}
 	return nil
+}
+
+func (a *Agent) prepareActiveMessages(ctx context.Context, record session.Session, turn int, emit func(Event)) ([]conversation.Message, error) {
+	latest, err := a.latestCompaction(ctx, record.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	activeMessages, err := compaction.BuildActiveMessages(record.Conversation.Messages, latest)
+	if err != nil {
+		return nil, fmt.Errorf("build active messages: %w", err)
+	}
+
+	totalTokens := compaction.EstimateConversationTokens(activeMessages)
+	if !compaction.ShouldCompact(totalTokens, a.config.contextWindow(), a.config.Compaction) {
+		return activeMessages, nil
+	}
+
+	return a.compactForReason(ctx, record, turn, session.CompactionTriggerThreshold, emit)
+}
+
+func (a *Agent) compactForReason(
+	ctx context.Context,
+	record session.Session,
+	turn int,
+	reason session.CompactionTrigger,
+	emit func(Event),
+) ([]conversation.Message, error) {
+	latest, err := a.latestCompaction(ctx, record.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	candidateMessages, previousSummary, err := compactionCandidates(record.Conversation.Messages, latest)
+	if err != nil {
+		return nil, err
+	}
+
+	preparation, err := compaction.Prepare(candidateMessages, a.config.contextWindow(), a.config.Compaction)
+	if err != nil {
+		return nil, fmt.Errorf("prepare compaction: %w", err)
+	}
+	if !preparation.NeedsCompaction && reason == session.CompactionTriggerOverflow {
+		cutPoint, cutErr := compaction.FindCutPoint(candidateMessages, a.config.Compaction.KeepRecentTokens)
+		if cutErr != nil {
+			return nil, fmt.Errorf("force overflow compaction cut point: %w", cutErr)
+		}
+		if cutPoint.FirstKeptIndex > 0 {
+			preparation = compaction.Preparation{
+				NeedsCompaction:     true,
+				TokensBefore:        compaction.EstimateConversationTokens(candidateMessages),
+				FirstKeptMessageID:  cutPoint.FirstKeptMessageID,
+				MessagesToSummarize: append([]conversation.Message(nil), candidateMessages[:cutPoint.FirstKeptIndex]...),
+				KeptMessages:        append([]conversation.Message(nil), candidateMessages[cutPoint.FirstKeptIndex:]...),
+			}
+		}
+	}
+	if !preparation.NeedsCompaction || len(preparation.MessagesToSummarize) == 0 {
+		return compaction.BuildActiveMessages(record.Conversation.Messages, latest)
+	}
+
+	emit(Event{
+		Type:             EventTypeCompactionStarted,
+		SessionID:        record.ID,
+		Turn:             turn,
+		CompactionReason: reason,
+		TokensBefore:     preparation.TokensBefore,
+	})
+
+	summarizer, err := compaction.NewSummarizer(a.provider, a.config.Model)
+	if err != nil {
+		emit(Event{Type: EventTypeCompactionFailed, SessionID: record.ID, Turn: turn, CompactionReason: reason, TokensBefore: preparation.TokensBefore, Err: err})
+		return nil, err
+	}
+
+	summaryResult, err := summarizer.Summarize(ctx, record.ID, compaction.SummaryRequest{
+		Messages:        preparation.MessagesToSummarize,
+		PreviousSummary: previousSummary,
+	})
+	if err != nil {
+		emit(Event{Type: EventTypeCompactionFailed, SessionID: record.ID, Turn: turn, CompactionReason: reason, TokensBefore: preparation.TokensBefore, Err: err})
+		return nil, err
+	}
+
+	artifact, err := a.store.AppendCompaction(ctx, record.ID, session.CompactionParams{
+		Summary:            summaryResult.Summary,
+		FirstKeptMessageID: preparation.FirstKeptMessageID,
+		TokensBefore:       preparation.TokensBefore,
+		Trigger:            reason,
+	})
+	if err != nil {
+		emit(Event{Type: EventTypeCompactionFailed, SessionID: record.ID, Turn: turn, CompactionReason: reason, TokensBefore: preparation.TokensBefore, Err: err})
+		return nil, fmt.Errorf("persist compaction: %w", err)
+	}
+
+	activeMessages, err := compaction.BuildActiveMessages(record.Conversation.Messages, artifact)
+	if err != nil {
+		emit(Event{Type: EventTypeCompactionFailed, SessionID: record.ID, Turn: turn, CompactionReason: reason, TokensBefore: preparation.TokensBefore, Err: err})
+		return nil, fmt.Errorf("rebuild compacted context: %w", err)
+	}
+
+	emit(Event{
+		Type:             EventTypeCompactionCompleted,
+		SessionID:        record.ID,
+		Turn:             turn,
+		CompactionReason: reason,
+		TokensBefore:     preparation.TokensBefore,
+		Compaction:       &artifact,
+	})
+	return activeMessages, nil
+}
+
+func (a *Agent) latestCompaction(ctx context.Context, sessionID string) (session.Compaction, error) {
+	artifact, err := a.store.GetLatestCompaction(ctx, sessionID)
+	if err == nil {
+		return artifact, nil
+	}
+	if errors.Is(err, session.ErrCompactionNotFound) {
+		return session.Compaction{}, nil
+	}
+	return session.Compaction{}, fmt.Errorf("get latest compaction: %w", err)
+}
+
+func compactionCandidates(messages []conversation.Message, latest session.Compaction) ([]conversation.Message, string, error) {
+	if latest.ID == "" {
+		return messages, "", nil
+	}
+
+	firstKeptIndex := -1
+	for i, message := range messages {
+		if message.ID == latest.FirstKeptMessageID {
+			firstKeptIndex = i
+			break
+		}
+	}
+	if firstKeptIndex == -1 {
+		return nil, "", fmt.Errorf("latest compaction first kept message %q not found", latest.FirstKeptMessageID)
+	}
+	return messages[firstKeptIndex:], latest.Summary, nil
+}
+
+func (c Config) contextWindow() int {
+	if c.Model.ContextWindow > 0 {
+		return c.Model.ContextWindow
+	}
+	return 200000
+}
+
+func isContextOverflowError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "context window") ||
+		strings.Contains(msg, "context length") ||
+		strings.Contains(msg, "context limit") ||
+		strings.Contains(msg, "too large for model") ||
+		strings.Contains(msg, "maximum context length")
 }
 
 func extractToolCalls(message conversation.Message) []tools.Call {

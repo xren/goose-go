@@ -36,7 +36,7 @@ in_progress
 - [x] Refactor `internal/agent` to emit structured live events
 - [x] Keep blocking reply and CLI wrappers as thin adapters over the streaming runtime
 - [x] Define a stable event taxonomy for turns, assistant deltas, tool lifecycle, approvals, and termination
-- [ ] Add context compaction logic (see [06a-context-compaction-plan.md](/Users/rex/projects/goose-go/progress/06a-context-compaction-plan.md))
+- [x] Add context compaction logic (see [06a-context-compaction-plan.md](/Users/rex/projects/goose-go/progress/06a-context-compaction-plan.md))
 - [x] Add task eval runner
 - [x] Add regression cases for streaming agent flows
 - [x] Add architecture and boundary checks
@@ -74,4 +74,6 @@ in_progress
 - The compaction planner slice is now complete: `internal/compaction` estimates context size, selects cut points, reconstructs active context from compaction artifacts, and serializes messages for future summarization input.
 - The compaction summarizer slice is now complete: `internal/compaction` has an embedded prompt template and a provider-backed summarizer that captures summary text and usage through the normalized provider interface.
 - The compaction planner is now documented in [internal/compaction/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/compaction/ARCHITECTURE.md) so the remaining agent integration work has a package-local design reference.
+- Threshold and overflow compaction are now integrated into `internal/agent`, persisted as explicit compaction artifacts, and exposed through the live event stream and JSONL traces.
+- Remaining compaction work is now mostly validation breadth: add eval coverage for continuation and resume after compaction, rather than building the core runtime path itself.
 - Architecture docs should stay synchronized with the current runtime shape so fresh agents can start Milestone 06 without reconstructing the current system from code first.

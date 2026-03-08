@@ -32,26 +32,30 @@ flowchart LR
     B --> C["Agent.Reply"]
     C --> D["Agent.ReplyStream"]
     D --> E["append user message to session"]
-    E --> F["provider.Request"]
-    F --> G["provider.Stream"]
-    G --> H["emit provider_text_delta events"]
-    G --> I["final assistant message"]
-    I --> J["persist assistant message"]
-    J --> K{"tool requests?"}
+    E --> F["rebuild active context"]
+    F --> G{"compaction needed?"}
+    G -- "yes" --> H["summarize older context + persist compaction"]
+    G -- "no" --> I["provider.Request"]
+    H --> I
+    I --> J["provider.Stream"]
+    J --> K["emit provider_text_delta events"]
+    J --> L["final assistant message"]
+    L --> M["persist assistant message"]
+    M --> N{"tool requests?"}
 
-    K -- "no" --> L["run_completed event"]
-    K -- "yes" --> M["approval check"]
+    N -- "no" --> O["run_completed event"]
+    N -- "yes" --> P["approval check"]
 
-    M -- "pending" --> N["approval_required event"]
-    M -- "deny" --> O["synthetic denied tool result"]
-    M -- "allow" --> P["tools.Registry.Execute"]
+    P -- "pending" --> Q["approval_required event"]
+    P -- "deny" --> R["synthetic denied tool result"]
+    P -- "allow" --> S["tools.Registry.Execute"]
 
-    P --> Q["tool result"]
-    O --> Q
-    Q --> R["persist tool response as tool-role message"]
-    R --> S{"max turns reached?"}
-    S -- "no" --> F
-    S -- "yes" --> T["run_failed event (max turns)"]
+    S --> T["tool result"]
+    R --> T
+    T --> U["persist tool response as tool-role message"]
+    U --> V{"max turns reached?"}
+    V -- "no" --> F
+    V -- "yes" --> W["run_failed event (max turns)"]
 ```
 
 ## Event Stream Flow
@@ -61,22 +65,24 @@ flowchart TD
     A["Agent.ReplyStream"] --> B["run_started"]
     B --> C["user_message_persisted"]
     C --> D["turn_started"]
-    D --> E["provider_text_delta*"]
-    E --> F["assistant_message_complete"]
-    F --> G["assistant_message_persisted"]
-    G --> H{"tool calls?"}
-    H -- "no" --> I["run_completed"]
-    H -- "yes" --> J["tool_call_detected"]
-    J --> K{"approval needed?"}
-    K -- "yes, no approver" --> L["approval_required"]
-    L --> M["run_completed (awaiting approval)"]
-    K -- "resolved" --> N["approval_resolved"]
-    N --> O["tool_execution_started"]
-    O --> P["tool_execution_finished"]
-    P --> Q["tool_message_persisted"]
-    Q --> R{"another turn?"}
-    R -- "yes" --> D
-    R -- "no" --> I
+    D --> E["compaction_started?"]
+    E --> F["compaction_completed or compaction_failed?"]
+    F --> G["provider_text_delta*"]
+    G --> H["assistant_message_complete"]
+    H --> I["assistant_message_persisted"]
+    I --> J{"tool calls?"}
+    J -- "no" --> K["run_completed"]
+    J -- "yes" --> L["tool_call_detected"]
+    L --> M{"approval needed?"}
+    M -- "yes, no approver" --> N["approval_required"]
+    N --> O["run_completed (awaiting approval)"]
+    M -- "resolved" --> P["approval_resolved"]
+    P --> Q["tool_execution_started"]
+    Q --> R["tool_execution_finished"]
+    R --> S["tool_message_persisted"]
+    S --> T{"another turn?"}
+    T -- "yes" --> D
+    T -- "no" --> K
 ```
 
 ## Package Topology
@@ -126,6 +132,8 @@ This is enough to support:
 - approval pause when no approver is present
 - deny branch through a synthetic tool result
 - default shell execution in the persisted session working directory when the model omits `working_dir`
+- threshold compaction before provider turns when the active context estimate exceeds the configured budget
+- one overflow-recovery compaction attempt when the provider reports a context-length failure
 - live runtime observation without reading SQLite directly
 
 ## Event Taxonomy
@@ -144,6 +152,9 @@ The current event set is intentionally narrow:
 - `tool_execution_started`
 - `tool_execution_finished`
 - `tool_message_persisted`
+- `compaction_started`
+- `compaction_completed`
+- `compaction_failed`
 - `run_completed`
 - `run_interrupted`
 - `run_failed`

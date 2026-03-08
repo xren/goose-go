@@ -189,12 +189,27 @@ Implementation notes:
 - Emit compaction events on the live event stream
 
 Status:
-- next
+- done
+
+Implementation notes:
+- `internal/agent/agent.go` now checks active context size before provider submission and runs threshold compaction when the estimated budget is exceeded.
+- The agent now performs one overflow-recovery compaction attempt when the provider returns a context-length style error, then retries the provider turn once with the compacted context.
+- Compaction artifacts are now persisted during live runs through `session.Store.AppendCompaction(...)`.
+- The live agent event stream now emits `compaction_started`, `compaction_completed`, and `compaction_failed`.
+- `internal/agent/agent_test.go` now covers both threshold compaction and overflow-recovery compaction paths.
 
 ### Step 5: CLI and trace integration
 - Ensure traces capture compaction events
 - Render minimal inline compaction notices in the CLI
 - Keep the rendered UX narrow; event correctness matters more than UI polish in this phase
+
+Status:
+- done
+
+Implementation notes:
+- `internal/app/run.go` now records compaction events into the existing per-session JSONL trace files.
+- The CLI renderer now emits narrow `system>` notices for compaction start, completion, and failure.
+- No new compaction-specific transport path was added; the existing event stream remains the single source for live rendering and traces.
 
 ### Step 6: Tests and evals
 - Unit tests:
@@ -208,7 +223,14 @@ Status:
 - Eval cases:
   - continue after threshold compaction
   - continue after overflow recovery
-  - resumed session after prior compaction
+- resumed session after prior compaction
+
+Status:
+- in_progress
+
+Implementation notes:
+- Unit and agent coverage now exist for planner behavior, summary generation, threshold compaction, and overflow recovery.
+- Dedicated eval-harness scenarios for post-compaction continuation and resume-after-compaction still need to be added.
 
 ## Acceptance Criteria
 

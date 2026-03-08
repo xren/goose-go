@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"goose-go/internal/conversation"
+	"goose-go/internal/session"
 	"goose-go/internal/tools"
 )
 
@@ -17,6 +18,9 @@ const (
 	EventTypeProviderTextDelta         EventType = "provider_text_delta"
 	EventTypeAssistantMessageComplete  EventType = "assistant_message_complete"
 	EventTypeAssistantMessagePersisted EventType = "assistant_message_persisted"
+	EventTypeCompactionStarted         EventType = "compaction_started"
+	EventTypeCompactionCompleted       EventType = "compaction_completed"
+	EventTypeCompactionFailed          EventType = "compaction_failed"
 	EventTypeToolCallDetected          EventType = "tool_call_detected"
 	EventTypeApprovalRequired          EventType = "approval_required"
 	EventTypeApprovalResolved          EventType = "approval_resolved"
@@ -29,17 +33,20 @@ const (
 )
 
 type Event struct {
-	Type             EventType             `json:"type"`
-	SessionID        string                `json:"session_id,omitempty"`
-	Turn             int                   `json:"turn,omitempty"`
-	Delta            string                `json:"delta,omitempty"`
-	Message          *conversation.Message `json:"message,omitempty"`
-	ToolCall         *tools.Call           `json:"tool_call,omitempty"`
-	ToolResult       *tools.Result         `json:"tool_result,omitempty"`
-	ApprovalRequest  *ApprovalRequest      `json:"approval_request,omitempty"`
-	ApprovalDecision ApprovalDecision      `json:"approval_decision,omitempty"`
-	Result           *Result               `json:"result,omitempty"`
-	Err              error                 `json:"-"`
+	Type             EventType                 `json:"type"`
+	SessionID        string                    `json:"session_id,omitempty"`
+	Turn             int                       `json:"turn,omitempty"`
+	Delta            string                    `json:"delta,omitempty"`
+	Message          *conversation.Message     `json:"message,omitempty"`
+	Compaction       *session.Compaction       `json:"compaction,omitempty"`
+	CompactionReason session.CompactionTrigger `json:"compaction_reason,omitempty"`
+	TokensBefore     int                       `json:"tokens_before,omitempty"`
+	ToolCall         *tools.Call               `json:"tool_call,omitempty"`
+	ToolResult       *tools.Result             `json:"tool_result,omitempty"`
+	ApprovalRequest  *ApprovalRequest          `json:"approval_request,omitempty"`
+	ApprovalDecision ApprovalDecision          `json:"approval_decision,omitempty"`
+	Result           *Result                   `json:"result,omitempty"`
+	Err              error                     `json:"-"`
 }
 
 func (a *Agent) ReplyStream(ctx context.Context, sessionID string, userText string) (<-chan Event, error) {
