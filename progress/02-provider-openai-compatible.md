@@ -34,7 +34,7 @@ in_progress
 
 ## Checklist
 
-- [ ] Split domain-facing session contracts from SQLite implementation by moving the SQLite backend under `internal/storage/sqlite`
+- [x] Split domain-facing session contracts from SQLite implementation by moving the SQLite backend under `internal/storage/sqlite`
 - [ ] Define provider interface around normalized conversation types only
 - [ ] Define model config and usage metadata
 - [ ] Add a Codex auth/cache reader with token refresh support
@@ -60,4 +60,5 @@ in_progress
 - Provider wire shapes should stay private to the provider package and be translated at the boundary.
 - The clean v1 path is to reuse the existing Codex auth cache instead of porting a full OAuth or login stack.
 - This milestone is where the repo should start turning architectural intent into mechanical checks.
+- The SQLite backend now lives under `internal/storage/sqlite` and owns schema migration through `PRAGMA user_version`.
 - The filename still reflects older wording, but the active milestone scope is now Codex-first provider foundation.

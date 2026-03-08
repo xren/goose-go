@@ -30,6 +30,7 @@ The [goose](/Users/rex/projects/goose-go/goose) submodule is the reference imple
 ## Repo Map
 
 - [AGENTS.md](/Users/rex/projects/goose-go/AGENTS.md): short navigation guide for agents
+- [docs/design-principles.md](/Users/rex/projects/goose-go/docs/design-principles.md): project design rules derived from the agent-first harness approach
 - [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md): target package layout and boundaries
 - [docs/invariants.md](/Users/rex/projects/goose-go/docs/invariants.md): hard rules for the project
 - [docs/goose-reference.md](/Users/rex/projects/goose-go/docs/goose-reference.md): what to copy, defer, or ignore from upstream Goose
@@ -70,6 +71,7 @@ make eval
 The repo now has the first runtime foundation in place:
 
 - root docs and progress tracking are set up
+- design principles for future feature work are documented at the root
 - structured conversation types exist
 - a SQLite-backed session store exists with tests for create, load, append, replace, and replay
 

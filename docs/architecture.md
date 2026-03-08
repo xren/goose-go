@@ -21,7 +21,9 @@ These packages define the intended shape of the system. They are architectural t
 - `internal/tools`
   Tool registry, tool contracts, and first-party developer tools such as `shell`, `write`, `edit`, and `tree`.
 - `internal/session`
-  Session store, persistence, resume/replay, token/accounting metadata.
+  Session types, store contracts, resume/replay semantics, token/accounting metadata.
+- `internal/storage`
+  Persistence implementations such as SQLite, including schema and migrations.
 - `internal/prompt`
   System prompt builder, local hint loading, prompt composition.
 - `internal/config`

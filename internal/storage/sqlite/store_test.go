@@ -1,4 +1,4 @@
-package session
+package sqlite
 
 import (
 	"context"
@@ -8,16 +8,17 @@ import (
 	"testing"
 
 	"goose-go/internal/conversation"
+	"goose-go/internal/session"
 )
 
-func TestSQLiteStoreSessionLifecycle(t *testing.T) {
+func TestStoreSessionLifecycle(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)
 
-	created, err := store.CreateSession(ctx, CreateParams{
+	created, err := store.CreateSession(ctx, session.CreateParams{
 		Name:       "test",
 		WorkingDir: t.TempDir(),
-		Type:       TypeUser,
+		Type:       session.TypeUser,
 	})
 	if err != nil {
 		t.Fatalf("create session: %v", err)
@@ -80,23 +81,23 @@ func TestSQLiteStoreSessionLifecycle(t *testing.T) {
 	}
 }
 
-func TestSQLiteStoreMissingSession(t *testing.T) {
+func TestStoreMissingSession(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)
 
-	if _, err := store.GetSession(ctx, "missing"); err != ErrSessionNotFound {
+	if _, err := store.GetSession(ctx, "missing"); err != session.ErrSessionNotFound {
 		t.Fatalf("expected ErrSessionNotFound, got %v", err)
 	}
 }
 
-func TestSQLiteStoreAddMessageConcurrent(t *testing.T) {
+func TestStoreAddMessageConcurrent(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)
 
-	created, err := store.CreateSession(ctx, CreateParams{
+	created, err := store.CreateSession(ctx, session.CreateParams{
 		Name:       "concurrent",
 		WorkingDir: t.TempDir(),
-		Type:       TypeUser,
+		Type:       session.TypeUser,
 	})
 	if err != nil {
 		t.Fatalf("create session: %v", err)
@@ -146,13 +147,27 @@ func TestSQLiteStoreAddMessageConcurrent(t *testing.T) {
 	}
 }
 
-func newTestStore(t *testing.T) *SQLiteStore {
+func TestStoreAppliesSchemaVersion(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	version, err := store.userVersion(ctx)
+	if err != nil {
+		t.Fatalf("read user version: %v", err)
+	}
+
+	if version != 1 {
+		t.Fatalf("expected schema version 1, got %d", version)
+	}
+}
+
+func newTestStore(t *testing.T) *Store {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "sessions.db")
-	store, err := NewSQLiteStore(path)
+	store, err := Open(path)
 	if err != nil {
-		t.Fatalf("new sqlite store: %v", err)
+		t.Fatalf("open sqlite store: %v", err)
 	}
 	t.Cleanup(func() {
 		_ = store.Close()

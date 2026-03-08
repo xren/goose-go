@@ -54,3 +54,4 @@ none
 
 - `goose/` remains read-only reference material.
 - `make eval` exists as a stable entrypoint but intentionally exits with a placeholder failure until the harness is implemented.
+- `docs/design-principles.md` extends the root system-of-record docs so fresh agents can apply the project’s agent-first design rules without prior chat context.
