@@ -30,13 +30,19 @@ func (m model) View() string {
 		parts = append(parts, m.errorTextStyle().Render(m.errorText))
 	}
 	parts = append(parts, m.headerView(), m.metaView(), m.footerStyle().Render(m.footerText()))
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+	left := lipgloss.JoinVertical(lipgloss.Left, parts...)
+	if !m.contextPanel.Open {
+		return left
+	}
+	right := m.contextPanelView()
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 }
 
 func (m *model) layout() {
 	if m.width > 0 {
-		m.input.Width = max(12, m.width-4)
+		m.input.Width = max(12, m.controlSurfaceWidth()-4)
 	}
+	m.syncContextViewport()
 }
 
 func (m model) previewView() string {

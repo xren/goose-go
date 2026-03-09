@@ -145,6 +145,9 @@ func (m model) footerText() string {
 	if m.approval.Request != nil {
 		return "a/y approve  d/n deny  esc/ctrl+c interrupt"
 	}
+	if m.contextPanel.Open {
+		return "up/down scroll context  pgup/pgdown jump  home/end jump  /context close  enter submit  ctrl+r sessions"
+	}
 	return "terminal scrollback handles history and selection  enter submit  ctrl+r sessions  /debug toggle  /help commands  esc/ctrl+c interrupt  ctrl+d quit"
 }
 

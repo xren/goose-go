@@ -17,8 +17,19 @@ func (m *model) handleLocalCommand(prompt string) (bool, tea.Cmd) {
 		m.status = "idle"
 		return true, m.printItemsCmd([]transcriptItem{
 			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "/help"},
-			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "commands:\n/model\n/theme\n/sessions\n/session\n/debug\n/new\n/help"},
+			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "commands:\n/model\n/theme\n/sessions\n/session\n/context\n/debug\n/new\n/help"},
 		})
+	case "/context":
+		m.contextPanel.Open = !m.contextPanel.Open
+		m.contextPanel.Err = ""
+		if !m.contextPanel.Open {
+			m.contextPanel.Busy = false
+			m.layout()
+			return true, nil
+		}
+		m.status = "idle"
+		m.layout()
+		return true, m.refreshContextCmd()
 	case "/session":
 		providerName, modelName := m.runtime.ProviderModel()
 		sessionID := fallback(m.sessionID, "new")
@@ -54,10 +65,14 @@ func (m *model) handleLocalCommand(prompt string) (bool, tea.Cmd) {
 		m.picker = modelPickerState{}
 		m.sessions = sessionPickerState{}
 		m.layout()
-		return true, m.printItemsCmd([]transcriptItem{
+		cmd := m.printItemsCmd([]transcriptItem{
 			{Kind: kindSystem, Prefix: "system", Text: "/new"},
 			{Kind: kindSystem, Prefix: "system", Text: "started a new session"},
 		})
+		if m.contextPanel.Open {
+			return true, tea.Batch(cmd, m.refreshContextCmd())
+		}
+		return true, cmd
 	case "/theme":
 		m.themes = themePickerState{
 			Open:     true,

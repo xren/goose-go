@@ -41,6 +41,8 @@ type agentEventMsg struct{ event agent.Event }
 type traceWriteFailedMsg struct{ err error }
 
 type noOpMsg struct{}
+type contextLoadedMsg struct{ snapshot app.ContextSnapshot }
+type contextLoadFailedMsg struct{ err error }
 
 func loadSessionCmd(ctx context.Context, runtime Runtime, sessionID string) tea.Cmd {
 	return func() tea.Msg {
@@ -113,6 +115,16 @@ func loadModelsCmd(ctx context.Context, runtime Runtime) tea.Cmd {
 			return modelsLoadFailedMsg{err: err}
 		}
 		return modelsLoadedMsg{items: items}
+	}
+}
+
+func loadContextCmd(ctx context.Context, runtime Runtime, sessionID string) tea.Cmd {
+	return func() tea.Msg {
+		snapshot, err := runtime.ContextSnapshot(ctx, sessionID)
+		if err != nil {
+			return contextLoadFailedMsg{err: err}
+		}
+		return contextLoadedMsg{snapshot: snapshot}
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"goose-go/internal/models"
 	tuitheme "goose-go/internal/tui/theme"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -27,6 +28,7 @@ type Runtime interface {
 	ResolveApprovalStream(ctx context.Context, sessionID string, decision agent.ApprovalDecision) (<-chan agent.Event, error)
 	ListAvailableModels(ctx context.Context) ([]models.Availability, error)
 	SetSelection(ctx context.Context, provider string, model string, sessionID string) error
+	ContextSnapshot(ctx context.Context, sessionID string) (app.ContextSnapshot, error)
 	WorkingDir() string
 	ProviderModel() (string, string)
 }
@@ -83,6 +85,14 @@ type themePickerState struct {
 	Selected int
 }
 
+type contextPanelState struct {
+	Open     bool
+	Busy     bool
+	Err      string
+	Snapshot app.ContextSnapshot
+	Viewport viewport.Model
+}
+
 type model struct {
 	ctx           context.Context
 	runtime       Runtime
@@ -102,6 +112,7 @@ type model struct {
 	picker        modelPickerState
 	sessions      sessionPickerState
 	themes        themePickerState
+	contextPanel  contextPanelState
 	theme         tuitheme.Palette
 	debug         bool
 	liveAssistant string
@@ -133,6 +144,8 @@ func newModel(ctx context.Context, runtime Runtime, opts Options) model {
 	input.Focus()
 	input.Prompt = "> "
 	input.CharLimit = 0
+	contextViewport := viewport.New(0, 0)
+	contextViewport.SetContent("")
 
 	return model{
 		ctx:        ctx,
@@ -145,6 +158,9 @@ func newModel(ctx context.Context, runtime Runtime, opts Options) model {
 		theme:      palette,
 		debug:      opts.Debug,
 		printer:    bubbleTranscriptPrinter{},
+		contextPanel: contextPanelState{
+			Viewport: contextViewport,
+		},
 	}
 }
 
@@ -288,6 +304,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		if m.contextPanel.Open && m.handleContextPanelKey(msg) {
+			return m, nil
+		}
+
 		if m.approval.Request != nil {
 			switch msg.String() {
 			case "ctrl+c", "esc":
@@ -330,6 +350,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, tea.Quit
 		case "esc":
+			if m.contextPanel.Open {
+				m.contextPanel.Open = false
+				m.contextPanel.Busy = false
+				m.contextPanel.Err = ""
+				m.layout()
+				return m, nil
+			}
 			if m.running && m.cancelRun != nil {
 				m.cancelRun()
 				m.status = "interrupting"
@@ -396,10 +423,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		providerName, modelName := m.runtime.ProviderModel()
 		m.picker = modelPickerState{}
 		m.status = "idle"
-		return m, m.printItemsCmd([]transcriptItem{
+		cmd := m.printItemsCmd([]transcriptItem{
 			{Kind: kindSystem, Prefix: "system", Text: "/model"},
 			{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("selected provider: %s\nselected model: %s", providerName, modelName)},
 		})
+		if m.contextPanel.Open {
+			return m, tea.Batch(cmd, m.refreshContextCmd())
+		}
+		return m, cmd
 	case modelSetFailedMsg:
 		m.picker.Busy = false
 		m.picker.Err = msg.err.Error()
@@ -419,7 +450,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status = "idle"
 		}
-		return m, m.printConversationCmd(msg.session.Conversation)
+		cmd := m.printConversationCmd(msg.session.Conversation)
+		if m.contextPanel.Open {
+			return m, tea.Batch(cmd, m.refreshContextCmd())
+		}
+		return m, cmd
 	case sessionLoadFailedMsg:
 		m.sessions = sessionPickerState{}
 		m.status = "failed"
@@ -435,6 +470,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.approval = approvalViewState{}
 		m.liveAssistant = ""
 		m.activeTools = nil
+		if m.contextPanel.Open {
+			return m, m.refreshContextCmd()
+		}
 		return m, nil
 	case runStartFailedMsg:
 		m.status = "failed"
@@ -464,6 +502,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, waitForAsync(m.async)
 	case noOpMsg:
 		return m, waitForAsync(m.async)
+	case contextLoadedMsg:
+		m.contextPanel.Busy = false
+		m.contextPanel.Err = ""
+		m.contextPanel.Snapshot = msg.snapshot
+		m.syncContextViewport()
+		return m, nil
+	case contextLoadFailedMsg:
+		m.contextPanel.Busy = false
+		m.contextPanel.Err = msg.err.Error()
+		m.syncContextViewport()
+		return m, nil
 	case error:
 		m.status = "failed"
 		m.errorText = msg.Error()
@@ -471,4 +520,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		return m, waitForAsync(m.async)
 	}
+}
+
+func (m *model) handleContextPanelKey(msg tea.KeyMsg) bool {
+	if !m.contextPanel.Open || m.sessions.Open || m.picker.Open || m.themes.Open || m.approval.Request != nil {
+		return false
+	}
+	switch msg.String() {
+	case "up", "k":
+		m.contextPanel.Viewport.LineUp(1)
+		return true
+	case "down", "j":
+		m.contextPanel.Viewport.LineDown(1)
+		return true
+	case "pgup", "ctrl+u", "ctrl+b":
+		m.contextPanel.Viewport.HalfPageUp()
+		return true
+	case "pgdown", "ctrl+d", "ctrl+f":
+		m.contextPanel.Viewport.HalfPageDown()
+		return true
+	case "home":
+		m.contextPanel.Viewport.GotoTop()
+		return true
+	case "end":
+		m.contextPanel.Viewport.GotoBottom()
+		return true
+	}
+	return false
 }

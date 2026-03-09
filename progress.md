@@ -47,6 +47,7 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - Tool lifecycle is now rendered as grouped transcript blocks in the TUI instead of flat request/result lines.
 - The TUI now defaults to compact rendering, with `--debug` and `/debug` available when full tool args/output and verbose UI detail are needed.
 - The first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`.
+- The TUI now exposes `/context`, which opens a persistent right-side inspector for the active next-turn provider context, including the resolved system prompt, compaction state, active messages, and estimated tokens.
 - Built-in dark/light TUI themes are now implemented through `internal/tui/theme`, exposed via `goose-go tui --theme <name>` and the local `/theme` picker.
 - The TUI now runs in normal screen mode without alt-screen or transcript mouse capture, so terminal-native scrolling, selection, and scrollback search work again.
 - The first markdown-rendering slice from [progress/07g-tui-markdown-rendering.md](/Users/rex/projects/goose-go/progress/07g-tui-markdown-rendering.md) is now implemented: `internal/tui/markdown` uses `goldmark`, theme-driven inline styling, and width-aware wrapping for assistant/system transcript text.

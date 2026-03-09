@@ -15,6 +15,15 @@ It exists to give the future agent loop a stable, provider-agnostic way to:
 Concrete implementations live under subpackages such as `internal/tools/shell`.
 The package must stay independent from provider HTTP formats and storage implementations.
 
+## Code Map
+
+- registry
+  Registers tools, exposes definitions, and dispatches calls by name.
+- normalized contracts
+  `Definition`, `Call`, and `Result` are the only shapes that leave the tools layer.
+- concrete tool packages
+  Read- and exec-oriented implementations live in subpackages under `internal/tools/*`.
+
 ## Runtime Flow
 
 ```mermaid
@@ -138,6 +147,12 @@ Together they establish both sides of the capability model:
 - Storage concerns stay outside the tools package.
 - The agent loop should orchestrate tools, not reimplement tool validation or dispatch logic.
 - Permission policy should be derived from tool metadata, not inferred from shell command text or tool names elsewhere in the runtime.
+
+## Cross-Cutting Concerns
+
+- approvals: default policy is derived from tool metadata so the agent does not maintain a second permission table
+- provider independence: provider-facing tool definitions are derived from normalized tool contracts, not vice versa
+- transcriptability: results stay structured so agent events, traces, and TUI rendering can describe tool work consistently
 
 ## Near-Term Growth
 

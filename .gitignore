@@ -1,5 +1,6 @@
 .DS_Store
 .idea/
 .vscode/
+.goose-go/
 bin/
 coverage.out

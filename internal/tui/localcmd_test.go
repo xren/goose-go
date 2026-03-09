@@ -1,9 +1,12 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"goose-go/internal/app"
 )
 
 func TestHelpCommandPrintsCommandList(t *testing.T) {
@@ -14,8 +17,49 @@ func TestHelpCommandPrintsCommandList(t *testing.T) {
 	m = updated.(model)
 	_ = cmd
 
-	if !containsPrinted(printer.blocks, "commands:") || !containsPrinted(printer.blocks, "/new") {
+	if !containsPrinted(printer.blocks, "commands:") || !containsPrinted(printer.blocks, "/new") || !containsPrinted(printer.blocks, "/context") {
 		t.Fatalf("expected help command output, got %#v", printer.blocks)
+	}
+}
+
+func TestContextCommandTogglesPanelAndLoadsSnapshot(t *testing.T) {
+	runtime := &fakeRuntime{
+		contextSnapshot: app.ContextSnapshot{
+			SystemPrompt: "You are helpful.",
+		},
+	}
+	m, _ := newCaptureModel(t, runtime, Options{})
+	m.width = 100
+	m.height = 24
+	m.layout()
+	m.input.SetValue("/context")
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if !m.contextPanel.Open || !m.contextPanel.Busy {
+		t.Fatalf("expected context panel to open and start loading, got %+v", m.contextPanel)
+	}
+	if cmd == nil {
+		t.Fatal("expected context load command")
+	}
+
+	updated, _ = m.Update(cmd())
+	m = updated.(model)
+	if m.contextPanel.Busy {
+		t.Fatal("expected context load to finish")
+	}
+	if runtime.contextCalls != 1 {
+		t.Fatalf("expected one context snapshot load, got %d", runtime.contextCalls)
+	}
+	if !strings.Contains(m.View(), "Current context") || !strings.Contains(m.View(), "System prompt") {
+		t.Fatalf("expected context panel in view, got %q", m.View())
+	}
+
+	m.input.SetValue("/context")
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if m.contextPanel.Open {
+		t.Fatal("expected context panel to close on second toggle")
 	}
 }
 

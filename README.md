@@ -31,7 +31,7 @@ The [goose](/Users/rex/projects/goose-go/goose) submodule is the reference imple
 
 - [AGENTS.md](/Users/rex/projects/goose-go/AGENTS.md): short navigation guide for agents
 - [docs/design-principles.md](/Users/rex/projects/goose-go/docs/design-principles.md): project design rules derived from the agent-first harness approach
-- [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md): target package layout and boundaries
+- [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md): target package layout, boundaries, and index of subsystem `ARCHITECTURE.md` files
 - [internal/agent/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/agent/ARCHITECTURE.md): high-level architecture of the runtime loop and approval flow
 - [internal/session/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/session/ARCHITECTURE.md): session store boundary, summaries, and SQLite relationship
 - [internal/tools/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tools/ARCHITECTURE.md): high-level architecture of the tool runtime and first concrete tool
@@ -147,7 +147,7 @@ go run ./cmd/goose-go tui --theme light
 go run ./cmd/goose-go tui --session <session-id>
 ```
 
-Inside the TUI, `/model` opens the registry-backed model picker, `/theme` opens the built-in theme picker, `/sessions` opens the recent-session picker, `/session` reports current session metadata, `/new` resets to a fresh session state, and `/help` lists the local commands.
+Inside the TUI, `/model` opens the registry-backed model picker, `/theme` opens the built-in theme picker, `/sessions` opens the recent-session picker, `/session` reports current session metadata, `/new` resets to a fresh session state, `/context` toggles a scrollable right-side inspector for the active next-turn context, and `/help` lists the local commands.
 `goose-go run` cancels cleanly on `Ctrl-C`, writes per-session JSONL traces under `.goose-go/traces/`, and shares the same runtime/session path as the TUI.
 
 ## TUI Manual Test Runbook

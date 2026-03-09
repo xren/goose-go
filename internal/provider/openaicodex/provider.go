@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://chatgpt.com/backend-api"
+	defaultBaseURL               = "https://chatgpt.com/backend-api"
+	defaultResponseHeaderTimeout = 2 * time.Minute
 )
 
 type Provider struct {
@@ -116,9 +117,10 @@ func New(opts ...Option) (*Provider, error) {
 	p := &Provider{
 		authReader: authReader,
 		baseURL:    defaultBaseURL,
-		client: &http.Client{
-			Timeout: 90 * time.Second,
-		},
+		// Streaming responses should not use a whole-request timeout because SSE
+		// streams can legitimately run for a long time. Bound only the wait for
+		// initial response headers so stalled requests fail instead of hanging.
+		client: &http.Client{Transport: newDefaultTransport()},
 	}
 
 	for _, opt := range opts {
@@ -150,6 +152,16 @@ func WithDebugWriter(w io.Writer) Option {
 	return func(p *Provider) {
 		p.debugOut = w
 	}
+}
+
+func newDefaultTransport() http.RoundTripper {
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return http.DefaultTransport
+	}
+	clone := base.Clone()
+	clone.ResponseHeaderTimeout = defaultResponseHeaderTimeout
+	return clone
 }
 
 func (p *Provider) Stream(ctx context.Context, req provider.Request) (<-chan provider.Event, error) {

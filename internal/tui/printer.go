@@ -33,6 +33,9 @@ func (bubbleTranscriptPrinter) Cmd(blocks ...string) tea.Cmd {
 }
 
 func (m model) transcriptWidth() int {
+	if m.contextPanel.Open {
+		return max(32, m.controlSurfaceWidth())
+	}
 	if m.width > 0 {
 		return m.width
 	}

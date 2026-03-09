@@ -39,7 +39,6 @@ flowchart LR
     D --> K["internal/storage/sqlite"]
     K --> L[("sessions.db")]
 ```
-```
 
 ## Session Lifecycle
 
@@ -73,7 +72,6 @@ flowchart LR
     J --> K["AddMessage / ReplaceConversation"]
     K --> D
 ```
-```
 
 ## Core Types
 
@@ -101,6 +99,12 @@ Current `Store` methods:
 - `internal/agent` and `internal/app` should depend on `session.Store`, not on SQLite directly.
 - `internal/storage/sqlite` owns SQL queries, schema, and migrations.
 - UI layers should not query SQLite directly when a session-store method exists.
+
+## Cross-Cutting Concerns
+
+- replay: the session boundary is what lets CLI and TUI recover prior state without provider-specific reconstruction
+- runtime identity: provider and model selection now persist with the session so resumed work stays consistent
+- compaction: compaction artifacts remain session-scoped persistence, even though planning happens elsewhere
 
 ## Current Implementation
 

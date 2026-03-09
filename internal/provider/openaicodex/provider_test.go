@@ -85,6 +85,27 @@ func TestBuildHeaders(t *testing.T) {
 	}
 }
 
+func TestNewProviderDoesNotSetClientTimeout(t *testing.T) {
+	p, err := New()
+	if err != nil {
+		t.Fatalf("new provider: %v", err)
+	}
+
+	if p.client == nil {
+		t.Fatal("expected provider client")
+	}
+	if p.client.Timeout != 0 {
+		t.Fatalf("expected no default client timeout, got %s", p.client.Timeout)
+	}
+	transport, ok := p.client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("expected http.Transport, got %T", p.client.Transport)
+	}
+	if transport.ResponseHeaderTimeout != defaultResponseHeaderTimeout {
+		t.Fatalf("expected response header timeout %s, got %s", defaultResponseHeaderTimeout, transport.ResponseHeaderTimeout)
+	}
+}
+
 func TestProcessStream(t *testing.T) {
 	stream := "" +
 		"data: {\"type\":\"response.output_text.delta\",\"delta\":\"hel\"}\n\n" +

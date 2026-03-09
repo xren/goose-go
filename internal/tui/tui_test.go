@@ -20,6 +20,9 @@ import (
 
 type fakeRuntime struct {
 	workingDir         string
+	contextSnapshot    app.ContextSnapshot
+	contextSnapshotErr error
+	contextCalls       int
 	loadSession        session.Session
 	loadErr            error
 	replay             session.Session
@@ -153,6 +156,24 @@ func (f *fakeRuntime) SetSelection(_ context.Context, provider string, model str
 	return nil
 }
 
+func (f *fakeRuntime) ContextSnapshot(context.Context, string) (app.ContextSnapshot, error) {
+	f.contextCalls++
+	if f.contextSnapshotErr != nil {
+		return app.ContextSnapshot{}, f.contextSnapshotErr
+	}
+	if f.contextSnapshot.WorkingDir == "" {
+		f.contextSnapshot.WorkingDir = f.WorkingDir()
+	}
+	providerName, modelName := f.ProviderModel()
+	if f.contextSnapshot.Provider == "" {
+		f.contextSnapshot.Provider = providerName
+	}
+	if f.contextSnapshot.Model == "" {
+		f.contextSnapshot.Model = modelName
+	}
+	return f.contextSnapshot, nil
+}
+
 func (f *fakeTraceWriter) Write(event agent.Event) error {
 	f.written = append(f.written, event)
 	return nil
@@ -256,6 +277,62 @@ func TestLoadSessionCmdReplaysTranscript(t *testing.T) {
 	}
 	if !containsPrinted(printer.blocks, "first") || !containsPrinted(printer.blocks, "second") {
 		t.Fatalf("expected replayed transcript to be printed, got %#v", printer.blocks)
+	}
+}
+
+func TestRefreshContextCmdLoadsSnapshotWhenPanelOpen(t *testing.T) {
+	runtime := &fakeRuntime{
+		contextSnapshot: app.ContextSnapshot{
+			SystemPrompt: "You are helpful.",
+		},
+	}
+	m := newModel(context.Background(), runtime, Options{})
+	m.contextPanel.Open = true
+	m.width = 100
+	m.height = 24
+	m.layout()
+
+	cmd := m.refreshContextCmd()
+	if cmd == nil {
+		t.Fatal("expected refresh command")
+	}
+	if !m.contextPanel.Busy {
+		t.Fatal("expected context panel to enter busy state")
+	}
+
+	updated, _ := m.Update(cmd())
+	m = updated.(model)
+	if m.contextPanel.Busy {
+		t.Fatal("expected context panel to clear busy state")
+	}
+	if m.contextPanel.Snapshot.SystemPrompt != "You are helpful." {
+		t.Fatalf("expected snapshot to load, got %+v", m.contextPanel.Snapshot)
+	}
+}
+
+func TestEscClosesContextPanelBeforeInterruptingRun(t *testing.T) {
+	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+	m.contextPanel.Open = true
+	m.contextPanel.Busy = true
+	m.width = 100
+	m.height = 24
+	m.layout()
+	cancelled := false
+	m.running = true
+	m.status = "running"
+	m.cancelRun = func() { cancelled = true }
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(model)
+
+	if m.contextPanel.Open {
+		t.Fatal("expected esc to close the context panel")
+	}
+	if cancelled {
+		t.Fatal("expected esc not to interrupt the run while dismissing the context panel")
+	}
+	if m.status != "running" {
+		t.Fatalf("expected run status to stay running, got %q", m.status)
 	}
 }
 

@@ -16,21 +16,17 @@ import (
 	"goose-go/internal/session"
 	sqlitestore "goose-go/internal/storage/sqlite"
 	"goose-go/internal/tools"
-	"goose-go/internal/tools/fetchurl"
-	"goose-go/internal/tools/findfiles"
-	"goose-go/internal/tools/grep"
-	"goose-go/internal/tools/listdir"
-	"goose-go/internal/tools/readfile"
 	"goose-go/internal/tools/shell"
 )
 
 type Runtime struct {
-	store      storeCloser
-	agent      *agent.Agent
-	workingDir string
-	traceDir   string
-	provider   string
-	model      string
+	store        storeCloser
+	agent        *agent.Agent
+	workingDir   string
+	traceDir     string
+	provider     string
+	model        string
+	systemPrompt string
 }
 
 const defaultProviderName = "openai-codex"
@@ -78,26 +74,6 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 	}
 
 	registry := tools.NewRegistry()
-	if err := registry.Register(fetchurl.New()); err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("register fetch_url tool: %w", err)
-	}
-	if err := registry.Register(findfiles.New()); err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("register find_files tool: %w", err)
-	}
-	if err := registry.Register(grep.New()); err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("register grep tool: %w", err)
-	}
-	if err := registry.Register(listdir.New()); err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("register list_dir tool: %w", err)
-	}
-	if err := registry.Register(readfile.New()); err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("register read_file tool: %w", err)
-	}
 	if err := registry.Register(shell.New()); err != nil {
 		_ = store.Close()
 		return nil, fmt.Errorf("register shell tool: %w", err)
@@ -112,7 +88,11 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 		approver = interactiveApprover{in: in, out: out}
 	}
 
-	systemPrompt, _ := prompt.BuildRunSystemPrompt(prompt.DefaultRunSystemPrompt, workingDir)
+	systemPrompt, promptErr := prompt.BuildRunSystemPrompt(prompt.DefaultRunSystemPrompt, workingDir)
+	if promptErr != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("build system prompt: %w", promptErr)
+	}
 
 	runtime, err := agent.New(store, p, registry, agent.Config{
 		SystemPrompt: systemPrompt,
@@ -132,12 +112,13 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 	}
 
 	return &Runtime{
-		store:      store,
-		agent:      runtime,
-		workingDir: workingDir,
-		traceDir:   traceDir,
-		provider:   selection.Provider,
-		model:      selection.Model,
+		store:        store,
+		agent:        runtime,
+		workingDir:   workingDir,
+		traceDir:     traceDir,
+		provider:     selection.Provider,
+		model:        selection.Model,
+		systemPrompt: systemPrompt,
 	}, nil
 }
 

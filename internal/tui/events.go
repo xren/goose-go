@@ -18,7 +18,14 @@ func (m *model) applyAgentEvent(event agent.Event) tea.Cmd {
 		return nil
 	case agent.EventTypeUserMessagePersisted:
 		if event.Message != nil {
-			return m.printMessageCmd(*event.Message)
+			cmd := m.printMessageCmd(*event.Message)
+			if m.contextPanel.Open {
+				return tea.Batch(cmd, m.refreshContextCmd())
+			}
+			return cmd
+		}
+		if m.contextPanel.Open {
+			return m.refreshContextCmd()
 		}
 		return nil
 	case agent.EventTypeProviderTextDelta:
@@ -45,6 +52,9 @@ func (m *model) applyAgentEvent(event agent.Event) tea.Cmd {
 		return nil
 	case agent.EventTypeToolMessagePersisted:
 		if event.ToolResult == nil {
+			if m.contextPanel.Open {
+				return m.refreshContextCmd()
+			}
 			return nil
 		}
 		if event.ToolCall != nil && findToolGroup(m.activeTools, event.ToolCall.ID) < 0 {
@@ -59,13 +69,24 @@ func (m *model) applyAgentEvent(event agent.Event) tea.Cmd {
 		if idx := findToolGroup(m.activeTools, response.ID); idx >= 0 {
 			item := m.activeTools[idx]
 			m.activeTools = removeToolGroup(m.activeTools, response.ID)
-			return m.printItemsCmd([]transcriptItem{item})
+			cmd := m.printItemsCmd([]transcriptItem{item})
+			if m.contextPanel.Open {
+				return tea.Batch(cmd, m.refreshContextCmd())
+			}
+			return cmd
+		}
+		if m.contextPanel.Open {
+			return m.refreshContextCmd()
 		}
 		return nil
 	case agent.EventTypeCompactionStarted:
 		return m.printSystemCmd(fmt.Sprintf("compacting context (%s, %d tokens)", event.CompactionReason, event.TokensBefore))
 	case agent.EventTypeCompactionCompleted:
-		return m.printSystemCmd(fmt.Sprintf("compaction complete (%s)", event.CompactionReason))
+		cmd := m.printSystemCmd(fmt.Sprintf("compaction complete (%s)", event.CompactionReason))
+		if m.contextPanel.Open {
+			return tea.Batch(cmd, m.refreshContextCmd())
+		}
+		return cmd
 	case agent.EventTypeCompactionFailed:
 		return m.printErrorCmd(fmt.Sprintf("compaction failed (%s)", event.CompactionReason))
 	case agent.EventTypeApprovalRequired:
