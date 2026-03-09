@@ -134,7 +134,7 @@ func (m model) themePickerPanel() string {
 
 func (m model) footerText() string {
 	if m.sessions.Open {
-		return "up/down select  pgup/pgdown jump  home/end jump  enter open  esc close"
+		return "wheel/up/down select  pgup/pgdown jump  home/end jump  enter open  esc close"
 	}
 	if m.picker.Open {
 		return "up/down select  enter choose  esc close"
@@ -145,7 +145,7 @@ func (m model) footerText() string {
 	if m.approval.Request != nil {
 		return "a/y approve  d/n deny  esc/ctrl+c interrupt"
 	}
-	return "pgup/pgdown scroll  home/end jump  enter submit  ctrl+r sessions  /debug toggle  /help commands  esc/ctrl+c interrupt  ctrl+d quit"
+	return "wheel or up/down scroll  pgup/pgdown or ctrl+b/f jump  home/end jump  enter submit  ctrl+r sessions  /debug toggle  /help commands  esc/ctrl+c interrupt  ctrl+d quit"
 }
 
 func (m model) panelStyle(border lipgloss.Color) lipgloss.Style {

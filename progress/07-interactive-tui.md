@@ -51,7 +51,7 @@ Current note:
 - the first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`
 - built-in dark/light theme selection is now available through `--theme` and the TUI-local `/theme` picker
 - the transcript viewport now supports explicit history navigation through `PageUp` / `PageDown` and `Home` / `End`, and it no longer auto-snaps to bottom while the user is reading older output
-- Bubble Tea mouse capture is now disabled by default so transcript content can always be selected and copied with normal terminal behavior
+- Bubble Tea mouse capture is enabled again so transcript history and session pickers support wheel scrolling by default
 - `goose-go run /model` remains a local reporter, while `goose-go tui /model` now opens the picker
 - the next Stage 2 work now includes a dedicated styling/layout pass and a token-based theme plan inspired by `pi-mono`
 - the first slice from [07g-tui-markdown-rendering.md](/Users/rex/projects/goose-go/progress/07g-tui-markdown-rendering.md) is now implemented through `internal/tui/markdown`, with inline markdown rendering for assistant/system transcript text

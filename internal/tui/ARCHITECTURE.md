@@ -248,7 +248,7 @@ Current implementation detail:
 - `/new` resets the interactive surface to a fresh session state
 - `/debug` toggles debug mode for the current TUI session
 - `/theme` is handled locally in the TUI, opens a built-in theme picker, and updates only TUI presentation state
-- Bubble Tea mouse capture is intentionally disabled so transcript text can always be selected and copied with normal terminal behavior
+- Bubble Tea mouse capture is enabled so transcript wheel scrolling and session-picker wheel navigation work by default
 - shell-triggered approval-required runs open a focused approval panel with allow/deny actions
 - `/model` is handled locally in the TUI, opens a registry-backed picker, and does not start a provider run
 - `/sessions` is handled locally in the TUI, opens a recent-session picker, and loads the selected session through the runtime boundary

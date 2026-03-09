@@ -229,8 +229,8 @@ Or press `Ctrl-R`.
 - Verify `/help` lists commands, `/theme` opens the built-in theme picker, `/session` reports metadata, `/debug` toggles debug mode, and `/new` resets the interactive state.
 11. Exercise transcript history scrolling in the TUI:
 - use `PageUp` / `PageDown` and `Home` / `End`; while scrolled up, verify new assistant or tool output does not force the viewport back to the bottom
-12. Exercise terminal copy behavior in the TUI:
-- highlight transcript text directly with the mouse and copy it using normal terminal selection shortcuts
+12. Exercise mouse scrolling in the TUI:
+- use the mouse wheel or trackpad gesture over the transcript to scroll history
 12. Start the TUI with debug mode immediately: `go run ./cmd/goose-go tui --debug`
 ## How A Run Works
 

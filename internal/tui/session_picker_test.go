@@ -52,6 +52,30 @@ func TestSessionPickerLoadsSelectedSession(t *testing.T) {
 	}
 }
 
+func TestSessionPickerMouseWheelMovesSelection(t *testing.T) {
+	runtime := &fakeRuntime{
+		sessionSummaries: []session.Summary{
+			{ID: "sess_a", Name: "A"},
+			{ID: "sess_b", Name: "B"},
+			{ID: "sess_c", Name: "C"},
+		},
+	}
+	m := newModel(context.Background(), runtime, Options{})
+	m.sessions = sessionPickerState{Open: true, Items: runtime.sessionSummaries, Selected: 1}
+
+	updated, _ := m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelUp, Action: tea.MouseActionPress})
+	m = updated.(model)
+	if m.sessions.Selected != 0 {
+		t.Fatalf("expected wheel up to move selection to 0, got %d", m.sessions.Selected)
+	}
+
+	updated, _ = m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
+	m = updated.(model)
+	if m.sessions.Selected != 1 {
+		t.Fatalf("expected wheel down to move selection back to 1, got %d", m.sessions.Selected)
+	}
+}
+
 func TestSessionPickerLoadRestoresViewportHeight(t *testing.T) {
 	msgTime := time.Now().UTC()
 	summaries := make([]session.Summary, 12)

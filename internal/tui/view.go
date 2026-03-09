@@ -72,6 +72,7 @@ func (m *model) layout() {
 	}
 	m.viewport.Width = m.width
 	m.viewport.Height = bodyHeight
+	m.viewport.YPosition = 0
 	m.syncViewport(false)
 }
 

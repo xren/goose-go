@@ -51,6 +51,40 @@ func TestViewportScrollKeysMoveTranscript(t *testing.T) {
 	}
 }
 
+func TestViewportScrollAlternativeKeysMoveTranscript(t *testing.T) {
+	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+	m.width = 80
+	m.height = 12
+	for i := 0; i < 40; i++ {
+		m.items = append(m.items, transcriptItem{Kind: kindSystem, Prefix: "system", Text: strings.Repeat("line ", 4) + strconv.Itoa(i)})
+	}
+	m.layout()
+	m.syncViewport(true)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
+	m = updated.(model)
+	if m.viewport.AtBottom() {
+		t.Fatal("expected ctrl+p to move away from bottom")
+	}
+	offsetAfterUp := m.viewport.YOffset
+	if offsetAfterUp <= 0 {
+		t.Fatalf("expected positive offset after ctrl+p, got %d", offsetAfterUp)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlN})
+	m = updated.(model)
+	if m.viewport.YOffset < 0 {
+		t.Fatalf("expected non-negative offset after ctrl+n, got %d", m.viewport.YOffset)
+	}
+	beforeCtrlB := m.viewport.YOffset
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	m = updated.(model)
+	if m.viewport.YOffset >= beforeCtrlB {
+		t.Fatalf("expected ctrl+b to move upward from %d, got %d", beforeCtrlB, m.viewport.YOffset)
+	}
+}
+
 func TestViewportDoesNotSnapToBottomWhenUserScrolledUp(t *testing.T) {
 	m := newModel(context.Background(), &fakeRuntime{}, Options{})
 	m.width = 80
@@ -78,6 +112,30 @@ func TestViewportDoesNotSnapToBottomWhenUserScrolledUp(t *testing.T) {
 	}
 	if m.viewport.YOffset != offsetBefore {
 		t.Fatalf("expected viewport offset to stay %d, got %d", offsetBefore, m.viewport.YOffset)
+	}
+}
+
+func TestViewportMouseWheelMovesTranscript(t *testing.T) {
+	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+	m.width = 80
+	m.height = 12
+	for i := 0; i < 40; i++ {
+		m.items = append(m.items, transcriptItem{Kind: kindSystem, Prefix: "system", Text: "history " + strconv.Itoa(i)})
+	}
+	m.layout()
+	m.syncViewport(true)
+
+	updated, _ := m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelUp, Action: tea.MouseActionPress})
+	m = updated.(model)
+	if m.viewport.AtBottom() {
+		t.Fatal("expected wheel up to move away from bottom")
+	}
+
+	beforeDown := m.viewport.YOffset
+	updated, _ = m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
+	m = updated.(model)
+	if m.viewport.YOffset < beforeDown {
+		t.Fatalf("expected wheel down not to move further up, before=%d after=%d", beforeDown, m.viewport.YOffset)
 	}
 }
 
