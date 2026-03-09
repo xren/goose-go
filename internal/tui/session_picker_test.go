@@ -101,34 +101,6 @@ func TestSessionPickerLoadRestoresViewportHeight(t *testing.T) {
 	}
 }
 
-func TestSessionPickerMouseWheelMovesSelection(t *testing.T) {
-	summaries := make([]session.Summary, 6)
-	for i := range summaries {
-		summaries[i] = session.Summary{
-			ID:         "sess_" + strconv.Itoa(i),
-			Name:       "Session " + strconv.Itoa(i),
-			WorkingDir: "/tmp/project",
-			Provider:   "openai-codex",
-			Model:      "gpt-5-codex",
-		}
-	}
-
-	m := newModel(context.Background(), &fakeRuntime{}, Options{})
-	m.sessions = sessionPickerState{Open: true, Items: summaries}
-
-	updated, _ := m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
-	m = updated.(model)
-	if m.sessions.Selected != 1 {
-		t.Fatalf("expected wheel down to move selection to 1, got %d", m.sessions.Selected)
-	}
-
-	updated, _ = m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
-	m = updated.(model)
-	if m.sessions.Selected != 0 {
-		t.Fatalf("expected wheel up to move selection back to 0, got %d", m.sessions.Selected)
-	}
-}
-
 func TestSessionPickerPanelShowsWindowedItems(t *testing.T) {
 	summaries := make([]session.Summary, 20)
 	for i := range summaries {
@@ -155,5 +127,8 @@ func TestSessionPickerPanelShowsWindowedItems(t *testing.T) {
 	}
 	if !strings.Contains(panel, "showing ") {
 		t.Fatalf("expected windowed session hint, got:\n%s", panel)
+	}
+	if !strings.Contains(panel, "enter open  esc close") {
+		t.Fatalf("expected inline session picker action hint, got:\n%s", panel)
 	}
 }

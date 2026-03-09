@@ -50,9 +50,11 @@ Current note:
 - the TUI now defaults to compact rendering, with `--debug` and `/debug` available when full tool args/output and verbose UI detail are needed
 - the first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`
 - built-in dark/light theme selection is now available through `--theme` and the TUI-local `/theme` picker
-- the transcript viewport now supports mouse-wheel scrolling plus explicit history navigation through `PageUp` / `PageDown` and `Home` / `End`, and it no longer auto-snaps to bottom while the user is reading older output
+- the transcript viewport now supports explicit history navigation through `PageUp` / `PageDown` and `Home` / `End`, and it no longer auto-snaps to bottom while the user is reading older output
+- Bubble Tea mouse capture is now disabled by default so transcript content can always be selected and copied with normal terminal behavior
 - `goose-go run /model` remains a local reporter, while `goose-go tui /model` now opens the picker
 - the next Stage 2 work now includes a dedicated styling/layout pass and a token-based theme plan inspired by `pi-mono`
+- the first slice from [07g-tui-markdown-rendering.md](/Users/rex/projects/goose-go/progress/07g-tui-markdown-rendering.md) is now implemented through `internal/tui/markdown`, with inline markdown rendering for assistant/system transcript text
 
 ## Acceptance Criteria
 
@@ -79,3 +81,4 @@ Current note:
   - [07d-model-registry-and-selection.md](/Users/rex/projects/goose-go/progress/07d-model-registry-and-selection.md)
   - [07e-tui-styling-and-layout.md](/Users/rex/projects/goose-go/progress/07e-tui-styling-and-layout.md)
   - [07f-tui-theme-system.md](/Users/rex/projects/goose-go/progress/07f-tui-theme-system.md)
+  - [07g-tui-markdown-rendering.md](/Users/rex/projects/goose-go/progress/07g-tui-markdown-rendering.md)

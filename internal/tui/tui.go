@@ -150,7 +150,7 @@ type sessionsLoadFailedMsg struct{ err error }
 
 func Run(ctx context.Context, in io.Reader, out io.Writer, runtime Runtime, opts Options) error {
 	m := newModel(ctx, runtime, opts)
-	p := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(out), tea.WithAltScreen(), tea.WithMouseCellMotion())
+	p := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(out), tea.WithAltScreen())
 	_, err := p.Run()
 	return err
 }
@@ -168,8 +168,6 @@ func newModel(ctx context.Context, runtime Runtime, opts Options) model {
 
 	vp := viewport.New(0, 0)
 	vp.SetContent("")
-	vp.MouseWheelEnabled = true
-	vp.MouseWheelDelta = 4
 
 	return model{
 		ctx:        ctx,
@@ -199,28 +197,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.layout()
-		return m, nil
-	case tea.MouseMsg:
-		if m.sessions.Open {
-			switch msg.Button {
-			case tea.MouseButtonWheelUp:
-				if m.sessions.Selected > 0 {
-					m.sessions.Selected--
-				}
-				return m, nil
-			case tea.MouseButtonWheelDown:
-				if m.sessions.Selected < len(m.sessions.Items)-1 {
-					m.sessions.Selected++
-				}
-				return m, nil
-			}
-			return m, nil
-		}
-		if m.canScrollTranscript() {
-			var cmd tea.Cmd
-			m.viewport, cmd = m.viewport.Update(msg)
-			return m, cmd
-		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.sessions.Open {

@@ -27,7 +27,7 @@ func (m model) View() string {
 	if panel := m.themePickerPanel(); panel != "" {
 		parts = append(parts, panel)
 	}
-	parts = append(parts, m.input.View(), status, header, cwd, m.footerStyle().Render(m.footerText()))
+	parts = append(parts, m.composerView(), status, header, cwd, m.footerStyle().Render(m.footerText()))
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
@@ -132,6 +132,44 @@ func (m model) errorTextStyle() lipgloss.Style {
 
 func (m model) footerStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(m.theme.FooterMuted).Padding(0, 1)
+}
+
+func (m model) composerActive() bool {
+	return !m.running && !m.sessions.Open && !m.picker.Open && !m.themes.Open && m.approval.Request == nil
+}
+
+func (m model) composerView() string {
+	input := m.input
+	active := m.composerActive()
+	if active {
+		input.Focus()
+		input.PromptStyle = lipgloss.NewStyle().Foreground(m.theme.BorderActive).Bold(true)
+		input.TextStyle = lipgloss.NewStyle().Foreground(m.theme.Text)
+		input.PlaceholderStyle = lipgloss.NewStyle().Foreground(m.theme.PanelHint)
+		input.Cursor.Style = lipgloss.NewStyle().Foreground(m.theme.BorderActive)
+	} else {
+		input.Blur()
+		input.PromptStyle = lipgloss.NewStyle().Foreground(m.theme.Muted)
+		input.TextStyle = lipgloss.NewStyle().Foreground(m.theme.FooterText)
+		input.PlaceholderStyle = lipgloss.NewStyle().Foreground(m.theme.Dim)
+		input.Cursor.Style = lipgloss.NewStyle().Foreground(m.theme.Muted)
+	}
+
+	bg := m.theme.UserBG
+	fg := m.theme.FooterText
+	if active {
+		bg = m.theme.SelectedBG
+		fg = m.theme.Text
+	}
+
+	style := lipgloss.NewStyle().
+		Foreground(fg).
+		Background(bg).
+		Padding(0, 1)
+	if m.width > 0 {
+		style = style.Width(m.width)
+	}
+	return style.Render(input.View())
 }
 
 func (m model) sessionPickerMetrics() (visibleItems int, panelLines int) {

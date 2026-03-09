@@ -36,14 +36,19 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - Session persistence of provider/model is now implemented, and resumed sessions reuse that selection by default.
 - The TUI `/model` picker is now implemented on top of the registry-backed selection path.
 - The TUI recent-session picker is now implemented on top of `ListSessions(...)`, exposed through `/sessions` and `Ctrl-R`.
-- The recent-session picker now has its own scrollable window and consumes wheel, `PageUp` / `PageDown`, `Home`, and `End` for long session lists.
-- The TUI transcript now supports mouse-wheel scrolling plus explicit history navigation with `PageUp`/`PageDown` and `Home`/`End`, and it no longer auto-snaps to bottom while the user is reading older output.
+- The recent-session picker now has its own scrollable window and consumes `PageUp` / `PageDown`, `Home`, and `End` for long session lists.
+- The TUI transcript now supports explicit history navigation with `PageUp`/`PageDown` and `Home`/`End`, and it no longer auto-snaps to bottom while the user is reading older output.
 - The TUI now uses a transcript-first layout: session/model/cwd/status metadata render in the lower control area instead of occupying the top of the screen.
 - Human messages in the TUI now render with a subdued gray background bubble instead of plain foreground-only text.
+- Human message bubbles now span the full transcript width with fixed horizontal padding instead of hugging only the text width.
+- Human message bubbles now use a lighter background tone, while vertical separation between turns is handled at the transcript-item level instead of inside each bubble.
+- Interaction-surface polish is now underway: the composer has clearer active/inactive treatment, and pickers now show inline confirm/cancel hints with stronger selected-row emphasis.
 - Tool lifecycle is now rendered as grouped transcript blocks in the TUI instead of flat request/result lines.
 - The TUI now defaults to compact rendering, with `--debug` and `/debug` available when full tool args/output and verbose UI detail are needed.
 - The first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`.
 - Built-in dark/light TUI themes are now implemented through `internal/tui/theme`, exposed via `goose-go tui --theme <name>` and the local `/theme` picker.
+- Bubble Tea mouse capture is now disabled in the TUI so transcript text can always be highlighted and copied with normal terminal selection behavior.
+- The first markdown-rendering slice from [progress/07g-tui-markdown-rendering.md](/Users/rex/projects/goose-go/progress/07g-tui-markdown-rendering.md) is now implemented: `internal/tui/markdown` uses `goldmark`, theme-driven inline styling, and width-aware wrapping for assistant/system transcript text.
 - The root architecture diagram in [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md) is now synced to the current runtime shape, including `internal/app`, `internal/models`, `internal/compaction`, trace writing, and the live TUI/event-stream path.
 - The default runtime max-turn limit is now 10000 instead of 8, so long CLI and TUI sessions do not stop early under normal use.
 - `goose-go run /model` remains a local reporter, while `goose-go tui /model` now opens the registry-backed picker.
@@ -56,6 +61,7 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
   - [progress/07d-model-registry-and-selection.md](/Users/rex/projects/goose-go/progress/07d-model-registry-and-selection.md)
   - [progress/07e-tui-styling-and-layout.md](/Users/rex/projects/goose-go/progress/07e-tui-styling-and-layout.md)
   - [progress/07f-tui-theme-system.md](/Users/rex/projects/goose-go/progress/07f-tui-theme-system.md)
+  - [progress/07g-tui-markdown-rendering.md](/Users/rex/projects/goose-go/progress/07g-tui-markdown-rendering.md)
 - The TUI planning files are now populated with the execution plan; implementation should start from `07c` and `07a`, not from the rollup alone.
 - `internal/agent` now exposes a live event stream through `ReplyStream`, and `Reply` is now a wrapper over that streaming runtime.
 - `internal/app` and `cmd/goose-go run` now consume the live agent event stream instead of rendering only after completion.

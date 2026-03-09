@@ -9,6 +9,7 @@ import (
 
 	"goose-go/internal/conversation"
 	"goose-go/internal/tools"
+	"goose-go/internal/tui/markdown"
 	tuitheme "goose-go/internal/tui/theme"
 )
 
@@ -75,9 +76,10 @@ func renderItem(theme tuitheme.Palette, item transcriptItem, width int, showTool
 	case kindUser:
 		return renderUserText(text, width, theme)
 	case kindAssistant, kindLiveBuffer:
-		return renderWrappedText(text, width, lipgloss.NewStyle().Foreground(theme.AssistantText))
+		return renderMarkdownText(theme, text, width, lipgloss.NewStyle().Foreground(theme.AssistantText))
 	case kindSystem:
-		return renderLabeledBlock(
+		return renderLabeledMarkdownBlock(
+			theme,
 			"system>",
 			text,
 			width,
@@ -106,14 +108,25 @@ func renderItem(theme tuitheme.Palette, item transcriptItem, width int, showTool
 func renderUserText(text string, width int, theme tuitheme.Palette) string {
 	style := lipgloss.NewStyle().
 		Foreground(theme.UserText).
-		Background(theme.UserBG).
-		Padding(0, 1)
+		Background(theme.UserBG)
 
 	if width <= 0 {
-		return style.Render(text)
+		return style.Padding(0, 2).Render(text)
 	}
 
-	return style.MaxWidth(max(8, width-2)).Render(text)
+	const padX = 2
+	innerWidth := max(8, width-(padX*2))
+	wrapped := lipgloss.NewStyle().Width(innerWidth).Render(text)
+
+	padded := make([]string, 0, len(strings.Split(wrapped, "\n")))
+	lines := strings.Split(wrapped, "\n")
+	for _, line := range lines {
+		visible := strings.Repeat(" ", padX) + line
+		remaining := max(0, width-lipgloss.Width(visible))
+		visible += strings.Repeat(" ", remaining)
+		padded = append(padded, style.Render(visible))
+	}
+	return strings.Join(padded, "\n")
 }
 
 func renderWrappedText(text string, width int, style lipgloss.Style) string {
@@ -121,6 +134,10 @@ func renderWrappedText(text string, width int, style lipgloss.Style) string {
 		return style.Render(text)
 	}
 	return style.Width(width).Render(text)
+}
+
+func renderMarkdownText(theme tuitheme.Palette, text string, width int, base lipgloss.Style) string {
+	return markdown.Render(theme, text, width, base)
 }
 
 func renderLabeledBlock(label string, text string, width int, labelStyle lipgloss.Style, bodyStyle lipgloss.Style) string {
@@ -133,6 +150,29 @@ func renderLabeledBlock(label string, text string, width int, labelStyle lipglos
 	left := labelStyle.Width(labelWidth).Render(label)
 	right := bodyStyle.Width(bodyWidth).Render(" " + text)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+}
+
+func renderLabeledMarkdownBlock(theme tuitheme.Palette, label string, text string, width int, labelStyle lipgloss.Style, bodyBase lipgloss.Style) string {
+	if width <= 0 {
+		return labelStyle.Render(label) + " " + markdown.Render(theme, text, 0, bodyBase)
+	}
+
+	labelWidth := min(12, max(8, lipgloss.Width(label)+1))
+	bodyWidth := max(8, width-labelWidth)
+	rendered := markdown.Render(theme, text, max(8, bodyWidth-1), bodyBase)
+
+	lines := strings.Split(rendered, "\n")
+	out := make([]string, 0, len(lines))
+	for i, line := range lines {
+		leftLabel := ""
+		if i == 0 {
+			leftLabel = label
+		}
+		left := labelStyle.Width(labelWidth).Render(leftLabel)
+		right := lipgloss.NewStyle().Width(bodyWidth).Render(" " + line)
+		out = append(out, lipgloss.JoinHorizontal(lipgloss.Top, left, right))
+	}
+	return strings.Join(out, "\n")
 }
 
 func renderToolItem(theme tuitheme.Palette, item transcriptItem, width int, showToolDetails bool) string {

@@ -48,6 +48,8 @@ These packages define the intended shape of the system. They are architectural t
   Smoke tests, task evals, regression harness.
 - `internal/tui`
   Bubble Tea frontend, event adapter, transcript state, and interactive terminal rendering.
+- `internal/tui/markdown`
+  Inline markdown rendering for assistant/system transcript content, with width-aware styled wrapping.
 - `internal/tui/theme`
   Semantic TUI theme tokens, built-in themes, and theme selection helpers.
 
@@ -159,6 +161,7 @@ The root architecture doc defines package-level boundaries. Concrete subsystem b
 - [internal/tools/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tools/ARCHITECTURE.md): tool contract, registry, execution flow, and the first concrete `shell` tool
 - [internal/evals/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/evals/ARCHITECTURE.md): deterministic eval harness over real runtime boundaries and trace assertions
 - [internal/tui/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/ARCHITECTURE.md): Bubble Tea frontend, runtime bridge, and transcript state model over the live agent event stream
+- [internal/tui/markdown/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/markdown/ARCHITECTURE.md): inline markdown rendering for assistant/system transcript content
 - [internal/tui/theme/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/theme/ARCHITECTURE.md): semantic TUI theme tokens, built-in dark/light palettes, and theme selection boundaries
 
 ## Initial Runtime Scope

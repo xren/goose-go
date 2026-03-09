@@ -39,6 +39,7 @@ The [goose](/Users/rex/projects/goose-go/goose) submodule is the reference imple
 - [internal/provider/openaicodex/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/provider/openaicodex/ARCHITECTURE.md): high-level architecture of the first concrete provider
 - [internal/evals/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/evals/ARCHITECTURE.md): deterministic runtime eval harness and trace-based regression model
 - [internal/tui/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/ARCHITECTURE.md): Bubble Tea frontend architecture over the live agent event stream
+- [internal/tui/markdown/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/markdown/ARCHITECTURE.md): inline markdown rendering for assistant/system transcript content
 - [internal/tui/theme/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/theme/ARCHITECTURE.md): semantic TUI theme tokens and built-in dark/light theme model
 - [docs/invariants.md](/Users/rex/projects/goose-go/docs/invariants.md): hard rules for the project
 - [docs/goose-reference.md](/Users/rex/projects/goose-go/docs/goose-reference.md): what to copy, defer, or ignore from upstream Goose
@@ -227,7 +228,9 @@ Or press `Ctrl-R`.
 ```
 - Verify `/help` lists commands, `/theme` opens the built-in theme picker, `/session` reports metadata, `/debug` toggles debug mode, and `/new` resets the interactive state.
 11. Exercise transcript history scrolling in the TUI:
-- use the mouse wheel or trackpad, `PageUp` / `PageDown`, and `Home` / `End`; while scrolled up, verify new assistant or tool output does not force the viewport back to the bottom
+- use `PageUp` / `PageDown` and `Home` / `End`; while scrolled up, verify new assistant or tool output does not force the viewport back to the bottom
+12. Exercise terminal copy behavior in the TUI:
+- highlight transcript text directly with the mouse and copy it using normal terminal selection shortcuts
 12. Start the TUI with debug mode immediately: `go run ./cmd/goose-go tui --debug`
 ## How A Run Works
 

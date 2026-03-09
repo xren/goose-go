@@ -184,7 +184,7 @@ Acceptance:
 
 ### Phase 4: Interaction-Surface Polish
 
-Status: planned
+Status: in_progress
 
 Tasks:
 
@@ -195,6 +195,12 @@ Tasks:
 Acceptance:
 
 - the active interaction target is always visually obvious
+
+Implemented so far:
+
+- the composer now renders as a clearer active/inactive control surface instead of raw textinput output
+- picker panels now include inline confirm/cancel hints instead of relying only on the footer
+- selected rows in model/session/theme pickers now have stronger emphasis than cursor-only treatment
 
 ## Testing Plan
 
@@ -220,6 +226,9 @@ Current note:
 - the session picker now uses a windowed, scrollable list so long histories do not collapse the main transcript area
 - the layout is now transcript-first, with session/model/cwd/status metadata moved to the lower control area near the composer
 - user messages now render as gray-background bubbles, while assistant messages stay lower-noise foreground text
+- user message bubbles now fill the full transcript width with consistent horizontal padding
+- user message bubbles now use a lighter background shade, and vertical separation between turns is now handled between transcript items rather than inside each bubble
+- transcript items now have explicit blank-line spacing between turns, which keeps the user bubble tighter while preserving readability
 
 ## Notes
 

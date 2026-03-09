@@ -34,6 +34,54 @@ This package now contains the full Stage 1 MVP plus the first Stage 2 interactio
 
 Shell execution now requires approval on the TUI surface, and approval-required runs are handled inside the TUI through a focused approval panel backed by the existing approval continuation seam in `internal/agent` and `internal/app`.
 
+## Frontend Structure
+
+```mermaid
+flowchart LR
+    A["cmd/goose-go tui"] --> B["internal/app.OpenRuntime"]
+    A --> C["internal/tui.Run"]
+
+    B --> D["app.Runtime"]
+    D --> E["internal/models"]
+    D --> F["session.Store"]
+    D --> G["internal/agent"]
+
+    G --> H["ReplyStream / approval continuation"]
+    H --> I["agent events"]
+
+    C --> J["Bubble Tea model"]
+    J --> K["state reducer"]
+    K --> L["transcript state"]
+    K --> M["panel state"]
+    K --> N["composer state"]
+    K --> O["scroll state"]
+    K --> P["theme state"]
+
+    I --> J
+    J --> Q["viewport renderer"]
+    J --> R["local commands"]
+    J --> S["pickers / approval panel"]
+
+    Q --> T["transcript view"]
+    R --> U["/model /sessions /theme /debug /help /new"]
+    S --> V["model picker"]
+    S --> W["session picker"]
+    S --> X["theme picker"]
+    S --> Y["approval panel"]
+
+    P --> Z["internal/tui/theme"]
+
+    J --> AA["trace writer via app runtime"]
+    AA --> AB[".goose-go/traces/*.jsonl"]
+```
+
+This is the concrete frontend boundary:
+
+- `internal/app` composes the runtime and owns provider/session/model wiring
+- `internal/agent` owns execution and event emission
+- `internal/tui` owns state reduction, rendering, pickers, and local commands
+- traces are runtime artifacts, but the TUI is one of the consumers that drives them
+
 ## Runtime Diagram
 
 ```mermaid
@@ -161,6 +209,8 @@ Rendering rules:
 
 - user and assistant text render without explicit role prefixes; color and hierarchy distinguish them instead
 - user messages now render as subdued gray-background bubbles instead of plain foreground-only text
+- assistant and system message content now render through [markdown/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/markdown/ARCHITECTURE.md), which owns inline markdown parsing and styled wrapping while leaving transcript layout here
+- vertical breathing room between turns is now provided by transcript-item spacing rather than oversized padding inside each user bubble
 - streamed assistant deltas accumulate in a temporary live buffer
 - final assistant messages replace that live buffer to avoid duplicate output
 - each tool call is grouped into one logical transcript block keyed by tool call id
@@ -190,8 +240,7 @@ Current implementation detail:
 - `Ctrl-D` quits only when idle
 - `Ctrl-R` opens the recent-session picker when idle
 - `PageUp` / `PageDown` scroll the transcript viewport without leaving the composer
-- mouse wheel / trackpad scrolling now drives the transcript viewport directly
-- the recent-session picker now uses a windowed list and consumes wheel, `PageUp` / `PageDown`, `Home`, and `End` for long session lists
+- the recent-session picker now uses a windowed list and consumes `PageUp` / `PageDown`, `Home`, and `End` for long session lists
 - `Home` / `End` jump to the top or bottom of transcript history
 - the transcript only auto-follows new output when the viewport is already at the bottom; if the user scrolls up, new output does not yank the viewport back down
 - `/help` lists the current local command surface
@@ -199,9 +248,11 @@ Current implementation detail:
 - `/new` resets the interactive surface to a fresh session state
 - `/debug` toggles debug mode for the current TUI session
 - `/theme` is handled locally in the TUI, opens a built-in theme picker, and updates only TUI presentation state
+- Bubble Tea mouse capture is intentionally disabled so transcript text can always be selected and copied with normal terminal behavior
 - shell-triggered approval-required runs open a focused approval panel with allow/deny actions
 - `/model` is handled locally in the TUI, opens a registry-backed picker, and does not start a provider run
 - `/sessions` is handled locally in the TUI, opens a recent-session picker, and loads the selected session through the runtime boundary
+- the composer now has a clearer active/inactive surface treatment, and pickers now include inline confirm/cancel hints plus stronger selected-row emphasis
 - the TUI root context is now long-lived and cancelable, not capped by a fixed 5-minute deadline
 - TUI styling is now driven by semantic tokens in [theme/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/theme/ARCHITECTURE.md) instead of scattered color literals
 - the transcript now starts at the top of the screen; session/model/cwd/status metadata render in the lower control area above the footer

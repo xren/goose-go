@@ -81,40 +81,6 @@ func TestViewportDoesNotSnapToBottomWhenUserScrolledUp(t *testing.T) {
 	}
 }
 
-func TestMouseWheelScrollsTranscript(t *testing.T) {
-	m := newModel(context.Background(), &fakeRuntime{}, Options{})
-	m.width = 80
-	m.height = 12
-	for i := 0; i < 40; i++ {
-		m.items = append(m.items, transcriptItem{Kind: kindSystem, Prefix: "system", Text: "history " + strconv.Itoa(i)})
-	}
-	m.layout()
-	m.syncViewport(true)
-
-	if !m.viewport.AtBottom() {
-		t.Fatal("expected viewport to start at bottom")
-	}
-
-	updated, _ := m.Update(tea.MouseMsg{
-		Action: tea.MouseActionPress,
-		Button: tea.MouseButtonWheelUp,
-	})
-	m = updated.(model)
-	if m.viewport.AtBottom() {
-		t.Fatal("expected mouse wheel up to move away from bottom")
-	}
-
-	offsetAfterUp := m.viewport.YOffset
-	updated, _ = m.Update(tea.MouseMsg{
-		Action: tea.MouseActionPress,
-		Button: tea.MouseButtonWheelDown,
-	})
-	m = updated.(model)
-	if m.viewport.YOffset <= offsetAfterUp {
-		t.Fatalf("expected wheel down to move viewport back toward bottom, before=%d after=%d", offsetAfterUp, m.viewport.YOffset)
-	}
-}
-
 func TestRenderToolItemDoesNotExceedViewportWidth(t *testing.T) {
 	theme, err := tuitheme.Resolve("dark")
 	if err != nil {
@@ -217,6 +183,74 @@ func TestRenderAssistantItemDoesNotExceedViewportWidth(t *testing.T) {
 	}
 }
 
+func TestRenderAssistantItemConsumesInlineMarkdownMarkers(t *testing.T) {
+	theme, err := tuitheme.Resolve("dark")
+	if err != nil {
+		t.Fatalf("resolve theme: %v", err)
+	}
+	item := transcriptItem{
+		Kind: kindAssistant,
+		Text: "Use **goose-go** and `make check`.",
+	}
+
+	rendered := renderItem(theme, item, 80, false)
+	if strings.Contains(rendered, "**goose-go**") {
+		t.Fatalf("expected bold markdown markers to be consumed, got %q", rendered)
+	}
+	if strings.Contains(rendered, "`make check`") {
+		t.Fatalf("expected code markdown markers to be consumed, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "goose-go") || !strings.Contains(rendered, "make check") {
+		t.Fatalf("expected rendered text to retain markdown content, got %q", rendered)
+	}
+}
+
+func TestRenderSystemItemConsumesInlineMarkdownMarkers(t *testing.T) {
+	theme, err := tuitheme.Resolve("dark")
+	if err != nil {
+		t.Fatalf("resolve theme: %v", err)
+	}
+	item := transcriptItem{
+		Kind: kindSystem,
+		Text: "See **docs** in [architecture](https://example.com).",
+	}
+
+	rendered := renderItem(theme, item, 80, false)
+	if strings.Contains(rendered, "**docs**") {
+		t.Fatalf("expected bold markdown markers to be consumed, got %q", rendered)
+	}
+	if strings.Contains(rendered, "https://example.com") {
+		t.Fatalf("expected link URL to stay out of transcript text, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "architecture") {
+		t.Fatalf("expected link label to remain, got %q", rendered)
+	}
+}
+
+func TestRenderAssistantItemSupportsFencedCodeAndLists(t *testing.T) {
+	theme, err := tuitheme.Resolve("dark")
+	if err != nil {
+		t.Fatalf("resolve theme: %v", err)
+	}
+	item := transcriptItem{
+		Kind: kindAssistant,
+		Text: "Steps:\n\n- first item\n- second item\n\n```go\nfmt.Println(\"hello\")\n```",
+	}
+
+	rendered := renderItem(theme, item, 48, false)
+	if !strings.Contains(rendered, "- first item") {
+		t.Fatalf("expected rendered list item, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "fmt.Println(\"hello\")") {
+		t.Fatalf("expected rendered fenced code block, got %q", rendered)
+	}
+	for _, line := range strings.Split(rendered, "\n") {
+		if lipgloss.Width(line) > 48 {
+			t.Fatalf("expected rendered line width <= 48, got %d for line %q", lipgloss.Width(line), line)
+		}
+	}
+}
+
 func TestRenderUserAndAssistantItemsDoNotShowRolePrefixes(t *testing.T) {
 	theme, err := tuitheme.Resolve("dark")
 	if err != nil {
@@ -231,6 +265,44 @@ func TestRenderUserAndAssistantItemsDoNotShowRolePrefixes(t *testing.T) {
 	assistantRendered := renderItem(theme, transcriptItem{Kind: kindAssistant, Text: "world"}, 80, false)
 	if strings.Contains(assistantRendered, "assistant>") {
 		t.Fatalf("expected assistant rendering without prefix, got %q", assistantRendered)
+	}
+}
+
+func TestRenderUserItemFillsViewportWidth(t *testing.T) {
+	theme, err := tuitheme.Resolve("dark")
+	if err != nil {
+		t.Fatalf("resolve theme: %v", err)
+	}
+
+	rendered := renderItem(theme, transcriptItem{
+		Kind: kindUser,
+		Text: "this should render as a full-width gray bubble with padding and wrapping across the viewport",
+	}, 60, false)
+
+	for _, line := range strings.Split(rendered, "\n") {
+		if lipgloss.Width(line) != 60 {
+			t.Fatalf("expected user bubble line width == 60, got %d for line %q", lipgloss.Width(line), line)
+		}
+	}
+}
+
+func TestRenderItemsAddsVerticalSpacingBetweenMessages(t *testing.T) {
+	theme, err := tuitheme.Resolve("dark")
+	if err != nil {
+		t.Fatalf("resolve theme: %v", err)
+	}
+
+	rendered := renderItems(theme, []transcriptItem{
+		{Kind: kindUser, Text: "first"},
+		{Kind: kindAssistant, Text: "second"},
+	}, 60, false)
+
+	parts := strings.Split(rendered, "\n")
+	if len(parts) < 2 {
+		t.Fatalf("expected multiple rendered lines, got %q", rendered)
+	}
+	if parts[0] == parts[len(parts)-1] {
+		t.Fatalf("expected distinct transcript item rendering, got %q", rendered)
 	}
 }
 

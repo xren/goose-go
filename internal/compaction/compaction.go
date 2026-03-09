@@ -240,7 +240,7 @@ func SerializeForSummarization(messages []conversation.Message) string {
 		}
 		lines = append(lines, fmt.Sprintf("[%s]: %s", role, strings.Join(parts, "\n")))
 	}
-	return strings.Join(lines, "\n\n")
+	return strings.Join(lines, "\n")
 }
 
 func nearestTurnBoundary(messages []conversation.Message, index int) int {

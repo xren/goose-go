@@ -79,6 +79,10 @@ This is the core boundary:
 - TUI owns state reduction and rendering
 - session store is used for startup/resume, not as a live event bus
 
+Implementation note:
+
+- the package-local doc at [internal/tui/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/ARCHITECTURE.md) now includes a concrete frontend-structure graph showing how `cmd/goose-go tui`, `internal/app`, `internal/agent`, the Bubble Tea reducer, pickers, theme state, and trace writing fit together in the shipped implementation
+
 ## State Model
 
 The TUI should maintain at least:

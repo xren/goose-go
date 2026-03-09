@@ -54,10 +54,13 @@ func (m model) modelPickerPanel() string {
 					reason = "unavailable"
 				}
 				line = m.panelHintStyle().Render(fmt.Sprintf("%s - %s", line, reason))
+			} else if i == m.picker.Selected {
+				line = m.panelSelectedStyle().Render(line)
 			}
 			lines = append(lines, line)
 		}
 	}
+	lines = append(lines, m.panelHintStyle().Render("enter choose  esc close"))
 	if m.picker.Err != "" {
 		lines = append(lines, m.errorTextStyle().Render(m.picker.Err))
 	}
@@ -85,6 +88,9 @@ func (m model) sessionPickerPanel() string {
 			}
 			line := fmt.Sprintf("%s%s (%s)", cursor, item.Name, item.ID)
 			meta := fmt.Sprintf("%s • %s/%s • %d msgs", item.WorkingDir, item.Provider, item.Model, item.MessageCount)
+			if i == m.sessions.Selected {
+				line = m.panelSelectedStyle().Render(line)
+			}
 			lines = append(lines, line, m.panelHintStyle().Render("    "+meta))
 		}
 		if len(m.sessions.Items) > visibleItems {
@@ -93,6 +99,7 @@ func (m model) sessionPickerPanel() string {
 			lines = append(lines, m.panelHintStyle().Render(fmt.Sprintf("showing %d-%d of %d", startLabel, endLabel, len(m.sessions.Items))))
 		}
 	}
+	lines = append(lines, m.panelHintStyle().Render("enter open  esc close"))
 	if m.sessions.Err != "" {
 		lines = append(lines, m.errorTextStyle().Render(m.sessions.Err))
 	}
@@ -116,6 +123,9 @@ func (m model) themePickerPanel() string {
 		if string(item) == m.theme.Name {
 			line = line + " current"
 		}
+		if i == m.themes.Selected {
+			line = m.panelSelectedStyle().Render(line)
+		}
 		lines = append(lines, line)
 	}
 	lines = append(lines, m.panelHintStyle().Render("enter choose  esc close"))
@@ -124,7 +134,7 @@ func (m model) themePickerPanel() string {
 
 func (m model) footerText() string {
 	if m.sessions.Open {
-		return "wheel/up/down select  pgup/pgdown jump  home/end jump  enter open  esc close"
+		return "up/down select  pgup/pgdown jump  home/end jump  enter open  esc close"
 	}
 	if m.picker.Open {
 		return "up/down select  enter choose  esc close"
@@ -135,7 +145,7 @@ func (m model) footerText() string {
 	if m.approval.Request != nil {
 		return "a/y approve  d/n deny  esc/ctrl+c interrupt"
 	}
-	return "wheel/pgup/pgdown scroll  home/end jump  enter submit  ctrl+r sessions  /debug toggle  /help commands  esc/ctrl+c interrupt  ctrl+d quit"
+	return "pgup/pgdown scroll  home/end jump  enter submit  ctrl+r sessions  /debug toggle  /help commands  esc/ctrl+c interrupt  ctrl+d quit"
 }
 
 func (m model) panelStyle(border lipgloss.Color) lipgloss.Style {
@@ -156,4 +166,8 @@ func (m model) panelHintStyle() lipgloss.Style {
 
 func (m model) panelCursorStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(m.theme.Accent).Bold(true)
+}
+
+func (m model) panelSelectedStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Background(m.theme.PanelSelected).Foreground(m.theme.Text)
 }

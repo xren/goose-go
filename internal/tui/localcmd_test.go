@@ -17,6 +17,9 @@ func TestHelpCommandAppendsCommandList(t *testing.T) {
 	if !containsText(m.items, "system", "commands:") || !containsText(m.items, "system", "/new") {
 		t.Fatalf("expected help command output, got %#v", m.items)
 	}
+	if containsText(m.items, "system", "/copy") {
+		t.Fatalf("did not expect /copy in help output, got %#v", m.items)
+	}
 }
 
 func TestSessionCommandReportsCurrentState(t *testing.T) {

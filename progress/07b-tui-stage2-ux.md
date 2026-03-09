@@ -15,9 +15,7 @@ Stage 2 is not about visual polish first. It is about closing the main usability
 This stage should move `goose-go` closer in spirit to `pi-mono`'s interactive coding UX while staying native to Go and preserving the current event-driven runtime architecture.
 
 ## Status
-
 in_progress
-
 ## Dependencies
 
 - 07a TUI Stage 1 MVP
@@ -34,6 +32,7 @@ in_progress
 - compaction visibility beyond simple transcript notices
 - model registry and model-selection UI
 - styling and layout standardization for panels, transcript hierarchy, and footer surfaces
+- markdown-aware rendering of assistant/system transcript text
 - stronger TUI reducer and smoke coverage for the richer flows
 
 ## Scope Out
@@ -124,7 +123,6 @@ Implemented runtime surfaces:
 The remaining Stage 2 work now starts after approval UI.
 
 ### Phase 1: Approval UI
-
 Status: done
 
 Implemented behavior:
@@ -209,6 +207,7 @@ Acceptance:
 Current note:
 - approval, model selection, recent-session picking, grouped tool blocks, and the first local command set are now in place
 - shared panel styling, transcript hierarchy, and built-in tokenized dark/light themes are now in place
+- assistant and system transcript text now use a dedicated inline markdown renderer backed by `goldmark`, while transcript layout remains owned by `internal/tui`
 - remaining Stage 2 work is about interaction-surface polish, richer command surfaces, and eventual custom themes
 
 ### Phase 6: Styling and layout standardization
@@ -217,6 +216,7 @@ System of record:
 
 - [07e-tui-styling-and-layout.md](/Users/rex/projects/goose-go/progress/07e-tui-styling-and-layout.md)
 - [07f-tui-theme-system.md](/Users/rex/projects/goose-go/progress/07f-tui-theme-system.md)
+- [07g-tui-markdown-rendering.md](/Users/rex/projects/goose-go/progress/07g-tui-markdown-rendering.md)
 
 Tasks:
 
