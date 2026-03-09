@@ -36,7 +36,10 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - Session persistence of provider/model is now implemented, and resumed sessions reuse that selection by default.
 - The TUI `/model` picker is now implemented on top of the registry-backed selection path.
 - The TUI recent-session picker is now implemented on top of `ListSessions(...)`, exposed through `/sessions` and `Ctrl-R`.
+- The recent-session picker now has its own scrollable window and consumes wheel, `PageUp` / `PageDown`, `Home`, and `End` for long session lists.
 - The TUI transcript now supports mouse-wheel scrolling plus explicit history navigation with `PageUp`/`PageDown` and `Home`/`End`, and it no longer auto-snaps to bottom while the user is reading older output.
+- The TUI now uses a transcript-first layout: session/model/cwd/status metadata render in the lower control area instead of occupying the top of the screen.
+- Human messages in the TUI now render with a subdued gray background bubble instead of plain foreground-only text.
 - Tool lifecycle is now rendered as grouped transcript blocks in the TUI instead of flat request/result lines.
 - The TUI now defaults to compact rendering, with `--debug` and `/debug` available when full tool args/output and verbose UI detail are needed.
 - The first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`.

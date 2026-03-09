@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -97,5 +98,62 @@ func TestSessionPickerLoadRestoresViewportHeight(t *testing.T) {
 	}
 	if m.viewport.Height <= heightWithPicker {
 		t.Fatalf("expected viewport height to grow after picker closes, before=%d after=%d", heightWithPicker, m.viewport.Height)
+	}
+}
+
+func TestSessionPickerMouseWheelMovesSelection(t *testing.T) {
+	summaries := make([]session.Summary, 6)
+	for i := range summaries {
+		summaries[i] = session.Summary{
+			ID:         "sess_" + strconv.Itoa(i),
+			Name:       "Session " + strconv.Itoa(i),
+			WorkingDir: "/tmp/project",
+			Provider:   "openai-codex",
+			Model:      "gpt-5-codex",
+		}
+	}
+
+	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+	m.sessions = sessionPickerState{Open: true, Items: summaries}
+
+	updated, _ := m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	m = updated.(model)
+	if m.sessions.Selected != 1 {
+		t.Fatalf("expected wheel down to move selection to 1, got %d", m.sessions.Selected)
+	}
+
+	updated, _ = m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	m = updated.(model)
+	if m.sessions.Selected != 0 {
+		t.Fatalf("expected wheel up to move selection back to 0, got %d", m.sessions.Selected)
+	}
+}
+
+func TestSessionPickerPanelShowsWindowedItems(t *testing.T) {
+	summaries := make([]session.Summary, 20)
+	for i := range summaries {
+		summaries[i] = session.Summary{
+			ID:           "sess_" + strconv.Itoa(i),
+			Name:         "Session " + strconv.Itoa(i),
+			WorkingDir:   "/tmp/project",
+			Provider:     "openai-codex",
+			Model:        "gpt-5-codex",
+			MessageCount: i + 1,
+		}
+	}
+
+	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+	m.width = 120
+	m.height = 20
+	m.sessions = sessionPickerState{Open: true, Items: summaries, Selected: 10}
+	m.layout()
+
+	panel := m.sessionPickerPanel()
+	visibleItems, _ := m.sessionPickerMetrics()
+	if got := strings.Count(panel, " (sess_"); got != visibleItems {
+		t.Fatalf("expected %d visible items in panel, got %d\npanel:\n%s", visibleItems, got, panel)
+	}
+	if !strings.Contains(panel, "showing ") {
+		t.Fatalf("expected windowed session hint, got:\n%s", panel)
 	}
 }

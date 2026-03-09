@@ -73,9 +73,9 @@ func renderItem(theme tuitheme.Palette, item transcriptItem, width int, showTool
 	text := strings.TrimRight(item.Text, "\n")
 	switch item.Kind {
 	case kindUser:
-		return renderWrappedText(text, width, lipgloss.NewStyle().Foreground(theme.UserText))
+		return renderUserText(text, width, theme)
 	case kindAssistant, kindLiveBuffer:
-		return renderWrappedText(text, width, lipgloss.NewStyle().Foreground(theme.SystemText))
+		return renderWrappedText(text, width, lipgloss.NewStyle().Foreground(theme.AssistantText))
 	case kindSystem:
 		return renderLabeledBlock(
 			"system>",
@@ -101,6 +101,19 @@ func renderItem(theme tuitheme.Palette, item transcriptItem, width int, showTool
 		}
 		return fmt.Sprintf("%s> %s", prefix, text)
 	}
+}
+
+func renderUserText(text string, width int, theme tuitheme.Palette) string {
+	style := lipgloss.NewStyle().
+		Foreground(theme.UserText).
+		Background(theme.UserBG).
+		Padding(0, 1)
+
+	if width <= 0 {
+		return style.Render(text)
+	}
+
+	return style.MaxWidth(max(8, width-2)).Render(text)
 }
 
 func renderWrappedText(text string, width int, style lipgloss.Style) string {

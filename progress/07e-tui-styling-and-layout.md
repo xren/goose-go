@@ -217,6 +217,9 @@ Current note:
 - shared panel styling is now in place for approval, model, session, and theme pickers
 - transcript rendering now applies stronger hierarchy for user, assistant, system, and grouped tool blocks
 - footer and header surfaces are now more structured and carry model/theme/session context
+- the session picker now uses a windowed, scrollable list so long histories do not collapse the main transcript area
+- the layout is now transcript-first, with session/model/cwd/status metadata moved to the lower control area near the composer
+- user messages now render as gray-background bubbles, while assistant messages stay lower-noise foreground text
 
 ## Notes
 

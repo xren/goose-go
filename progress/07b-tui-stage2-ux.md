@@ -167,9 +167,9 @@ Implemented:
 - `/sessions` now opens a recent-session picker inside the TUI
 - `Ctrl-R` opens the same picker as a keyboard shortcut
 - selecting a session replays persisted conversation and adopts its persisted provider/model through the runtime boundary
+- the session picker now uses a scrollable window for long lists, with wheel and page-key navigation
 
 Acceptance:
-
 - users no longer need to copy session ids to resume work in the TUI
 
 ### Phase 4: Grouped tool rendering

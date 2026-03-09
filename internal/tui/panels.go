@@ -75,7 +75,10 @@ func (m model) sessionPickerPanel() string {
 	if len(m.sessions.Items) == 0 {
 		lines = append(lines, m.panelHintStyle().Render("No sessions found"))
 	} else {
-		for i, item := range m.sessions.Items {
+		visibleItems, _ := m.sessionPickerMetrics()
+		start, end := pickerWindow(m.sessions.Selected, len(m.sessions.Items), visibleItems)
+		for i := start; i < end; i++ {
+			item := m.sessions.Items[i]
 			cursor := "  "
 			if i == m.sessions.Selected {
 				cursor = m.panelCursorStyle().Render("> ")
@@ -83,6 +86,11 @@ func (m model) sessionPickerPanel() string {
 			line := fmt.Sprintf("%s%s (%s)", cursor, item.Name, item.ID)
 			meta := fmt.Sprintf("%s • %s/%s • %d msgs", item.WorkingDir, item.Provider, item.Model, item.MessageCount)
 			lines = append(lines, line, m.panelHintStyle().Render("    "+meta))
+		}
+		if len(m.sessions.Items) > visibleItems {
+			startLabel := start + 1
+			endLabel := end
+			lines = append(lines, m.panelHintStyle().Render(fmt.Sprintf("showing %d-%d of %d", startLabel, endLabel, len(m.sessions.Items))))
 		}
 	}
 	if m.sessions.Err != "" {
@@ -116,7 +124,7 @@ func (m model) themePickerPanel() string {
 
 func (m model) footerText() string {
 	if m.sessions.Open {
-		return "up/down select  enter open  esc close"
+		return "wheel/up/down select  pgup/pgdown jump  home/end jump  enter open  esc close"
 	}
 	if m.picker.Open {
 		return "up/down select  enter choose  esc close"

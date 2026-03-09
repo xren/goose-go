@@ -233,3 +233,23 @@ func TestRenderUserAndAssistantItemsDoNotShowRolePrefixes(t *testing.T) {
 		t.Fatalf("expected assistant rendering without prefix, got %q", assistantRendered)
 	}
 }
+
+func TestMetadataBarsRenderBelowTranscript(t *testing.T) {
+	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+	m.width = 80
+	m.height = 20
+	m.items = []transcriptItem{
+		{Kind: kindAssistant, Prefix: "assistant", Text: "transcript comes first"},
+	}
+	m.layout()
+
+	view := m.View()
+	transcriptIdx := strings.Index(view, "transcript comes first")
+	sessionIdx := strings.Index(view, "session:")
+	if transcriptIdx < 0 || sessionIdx < 0 {
+		t.Fatalf("expected transcript and session metadata in view, got:\n%s", view)
+	}
+	if sessionIdx < transcriptIdx {
+		t.Fatalf("expected session metadata below transcript, transcriptIdx=%d sessionIdx=%d\n%s", transcriptIdx, sessionIdx, view)
+	}
+}
