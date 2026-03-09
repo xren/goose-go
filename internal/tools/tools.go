@@ -15,10 +15,28 @@ type Tool interface {
 	Run(ctx context.Context, call Call) (Result, error)
 }
 
+type Capability string
+
+const (
+	CapabilityRead      Capability = "read"
+	CapabilityWrite     Capability = "write"
+	CapabilityExec      Capability = "exec"
+	CapabilityExtension Capability = "extension"
+)
+
+type ApprovalDefault string
+
+const (
+	ApprovalDefaultAllow ApprovalDefault = "allow"
+	ApprovalDefaultAsk   ApprovalDefault = "ask"
+)
+
 type Definition struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description,omitempty"`
-	InputSchema json.RawMessage `json:"input_schema,omitempty"`
+	Name            string          `json:"name"`
+	Description     string          `json:"description,omitempty"`
+	InputSchema     json.RawMessage `json:"input_schema,omitempty"`
+	Capability      Capability      `json:"capability"`
+	ApprovalDefault ApprovalDefault `json:"approval_default"`
 }
 
 type Call struct {
@@ -36,7 +54,12 @@ type Result struct {
 }
 
 type Registry struct {
-	tools map[string]Tool
+	tools map[string]registeredTool
+}
+
+type registeredTool struct {
+	tool Tool
+	def  Definition
 }
 
 var (
@@ -47,7 +70,7 @@ var (
 )
 
 func NewRegistry() *Registry {
-	return &Registry{tools: map[string]Tool{}}
+	return &Registry{tools: map[string]registeredTool{}}
 }
 
 func (r *Registry) Register(tool Tool) error {
@@ -58,7 +81,7 @@ func (r *Registry) Register(tool Tool) error {
 	if _, exists := r.tools[def.Name]; exists {
 		return fmt.Errorf("%w: %s", ErrDuplicateTool, def.Name)
 	}
-	r.tools[def.Name] = tool
+	r.tools[def.Name] = registeredTool{tool: tool, def: def}
 	return nil
 }
 
@@ -67,13 +90,21 @@ func (r *Registry) Get(name string) (Tool, error) {
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrToolNotFound, name)
 	}
-	return tool, nil
+	return tool.tool, nil
+}
+
+func (r *Registry) Definition(name string) (Definition, error) {
+	tool, ok := r.tools[name]
+	if !ok {
+		return Definition{}, fmt.Errorf("%w: %s", ErrToolNotFound, name)
+	}
+	return tool.def, nil
 }
 
 func (r *Registry) Definitions() []Definition {
 	defs := make([]Definition, 0, len(r.tools))
 	for _, tool := range r.tools {
-		defs = append(defs, tool.Definition())
+		defs = append(defs, tool.def)
 	}
 	sort.Slice(defs, func(i, j int) bool {
 		return defs[i].Name < defs[j].Name
@@ -104,6 +135,16 @@ func (r *Registry) Execute(ctx context.Context, call Call) (Result, error) {
 func (d Definition) Validate() error {
 	if d.Name == "" {
 		return errors.New("tool definition name is required")
+	}
+	switch d.Capability {
+	case CapabilityRead, CapabilityWrite, CapabilityExec, CapabilityExtension:
+	default:
+		return errors.New("tool definition capability is required")
+	}
+	switch d.ApprovalDefault {
+	case ApprovalDefaultAllow, ApprovalDefaultAsk:
+	default:
+		return errors.New("tool definition approval default is required")
 	}
 	return nil
 }

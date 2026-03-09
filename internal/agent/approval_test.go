@@ -2,11 +2,13 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
 	"goose-go/internal/conversation"
 	"goose-go/internal/provider"
+	"goose-go/internal/tools"
 )
 
 func TestReplyAwaitsApprovalWhenNoApprover(t *testing.T) {
@@ -179,4 +181,60 @@ func TestReplyDeniedToolContinues(t *testing.T) {
 	if toolMsg.Role != conversation.RoleTool || !toolMsg.Content[0].ToolResponse.IsError {
 		t.Fatalf("expected denied tool response, got %#v", toolMsg)
 	}
+}
+
+func TestReplyReadToolAutoAllowsEvenInApproveMode(t *testing.T) {
+	registry := tools.NewRegistry()
+	if err := registry.Register(readToolStub{}); err != nil {
+		t.Fatalf("register read tool: %v", err)
+	}
+
+	agent, store, record := newTestAgentWithRegistry(t, scriptedProvider{
+		respond: func(req provider.Request) []provider.Event {
+			if hasToolResponse(req.Messages) {
+				msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("done"))
+				return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+			}
+			msg := conversation.NewMessage(conversation.RoleAssistant, conversation.ToolRequest("call_1", "read_file", []byte(`{"path":"docs/architecture.md"}`)))
+			return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+		},
+	}, ApprovalModeApprove, nil, registry)
+
+	result, err := agent.Reply(context.Background(), record.ID, "read the architecture doc")
+	if err != nil {
+		t.Fatalf("reply: %v", err)
+	}
+	if result.Status != StatusCompleted {
+		t.Fatalf("expected completed status, got %q", result.Status)
+	}
+
+	got, err := store.GetSession(context.Background(), record.ID)
+	if err != nil {
+		t.Fatalf("get session: %v", err)
+	}
+	if len(got.Conversation.Messages) != 4 {
+		t.Fatalf("expected tool run to complete without pausing for approval, got %d messages", len(got.Conversation.Messages))
+	}
+	if got.Conversation.Messages[2].Role != conversation.RoleTool {
+		t.Fatalf("expected tool response persisted, got %#v", got.Conversation.Messages[2])
+	}
+}
+
+type readToolStub struct{}
+
+func (readToolStub) Definition() tools.Definition {
+	return tools.Definition{
+		Name:            "read_file",
+		Description:     "Read a file from disk.",
+		InputSchema:     json.RawMessage(`{"type":"object"}`),
+		Capability:      tools.CapabilityRead,
+		ApprovalDefault: tools.ApprovalDefaultAllow,
+	}
+}
+
+func (readToolStub) Run(context.Context, tools.Call) (tools.Result, error) {
+	return tools.Result{
+		ToolCallID: "call_1",
+		Content:    []conversation.ToolResult{{Type: "text", Text: "architecture doc"}},
+	}, nil
 }

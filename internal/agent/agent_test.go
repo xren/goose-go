@@ -506,6 +506,31 @@ func newTestAgent(t *testing.T, p provider.Provider, mode ApprovalMode, approver
 		t.Fatalf("register shell: %v", err)
 	}
 
+	return newTestAgentWithStoreAndRegistry(t, store, record, p, mode, approver, registry)
+}
+
+func newTestAgentWithRegistry(t *testing.T, p provider.Provider, mode ApprovalMode, approver Approver, registry *tools.Registry) (*Agent, session.Store, session.Session) {
+	t.Helper()
+
+	store, err := sqlitestore.Open(t.TempDir() + "/sessions.db")
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	record, err := store.CreateSession(context.Background(), session.CreateParams{Name: "test", WorkingDir: t.TempDir(), Type: session.TypeTerminal})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	return newTestAgentWithStoreAndRegistry(t, store, record, p, mode, approver, registry)
+}
+
+func newTestAgentWithStoreAndRegistry(t *testing.T, store session.Store, record session.Session, p provider.Provider, mode ApprovalMode, approver Approver, registry *tools.Registry) (*Agent, session.Store, session.Session) {
+	t.Helper()
+
 	agent, err := New(store, p, registry, Config{
 		SystemPrompt: "You are helpful.",
 		Model:        provider.ModelConfig{Provider: "test", Model: "test-model"},

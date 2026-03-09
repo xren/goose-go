@@ -119,6 +119,8 @@ go run ./cmd/goose-go run "/model"
 
 Shell tool execution now requires approval by default in both `goose-go run` and `goose-go tui`.
 
+`goose-go run` and `goose-go tui` now also load `AGENTS.md` from the working directory and ancestor directories up to the git root, appending the discovered files to the runtime system prompt as project context.
+
 For CLI `run`, inline terminal approval prompts are enabled by default. To disable the inline prompt and allow the run to pause instead, use:
 
 ```sh
@@ -227,10 +229,9 @@ Or press `Ctrl-R`.
 /new
 ```
 - Verify `/help` lists commands, `/theme` opens the built-in theme picker, `/session` reports metadata, `/debug` toggles debug mode, and `/new` resets the interactive state.
-11. Exercise transcript history scrolling in the TUI:
-- use `PageUp` / `PageDown` and `Home` / `End`; while scrolled up, verify new assistant or tool output does not force the viewport back to the bottom
-12. Exercise mouse scrolling in the TUI:
-- use the mouse wheel or trackpad gesture over the transcript to scroll history
+11. Exercise transcript history scrolling and selection in the TUI:
+- use the terminal's normal mouse wheel / trackpad gesture to scroll terminal history
+- select transcript text with the mouse and verify normal terminal copy behavior still works
 12. Start the TUI with debug mode immediately: `go run ./cmd/goose-go tui --debug`
 ## How A Run Works
 
@@ -281,7 +282,6 @@ sequenceDiagram
 
 This is the current runtime shape, not a future-state sketch: the CLI renders from the live agent event stream, sessions persist at each step, and tool execution can trigger another provider turn before the run completes.
 ## Current State
-
 The repo now has the first runtime foundation in place:
 
 - root docs and progress tracking are set up

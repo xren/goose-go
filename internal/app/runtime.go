@@ -10,11 +10,17 @@ import (
 
 	"goose-go/internal/agent"
 	"goose-go/internal/compaction"
+	"goose-go/internal/prompt"
 	"goose-go/internal/provider"
 	"goose-go/internal/provider/openaicodex"
 	"goose-go/internal/session"
 	sqlitestore "goose-go/internal/storage/sqlite"
 	"goose-go/internal/tools"
+	"goose-go/internal/tools/fetchurl"
+	"goose-go/internal/tools/findfiles"
+	"goose-go/internal/tools/grep"
+	"goose-go/internal/tools/listdir"
+	"goose-go/internal/tools/readfile"
 	"goose-go/internal/tools/shell"
 )
 
@@ -72,6 +78,26 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 	}
 
 	registry := tools.NewRegistry()
+	if err := registry.Register(fetchurl.New()); err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("register fetch_url tool: %w", err)
+	}
+	if err := registry.Register(findfiles.New()); err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("register find_files tool: %w", err)
+	}
+	if err := registry.Register(grep.New()); err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("register grep tool: %w", err)
+	}
+	if err := registry.Register(listdir.New()); err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("register list_dir tool: %w", err)
+	}
+	if err := registry.Register(readfile.New()); err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("register read_file tool: %w", err)
+	}
 	if err := registry.Register(shell.New()); err != nil {
 		_ = store.Close()
 		return nil, fmt.Errorf("register shell tool: %w", err)
@@ -86,8 +112,10 @@ func OpenRuntime(in io.Reader, out io.Writer, opts RunOptions) (*Runtime, error)
 		approver = interactiveApprover{in: in, out: out}
 	}
 
+	systemPrompt, _ := prompt.BuildRunSystemPrompt(prompt.DefaultRunSystemPrompt, workingDir)
+
 	runtime, err := agent.New(store, p, registry, agent.Config{
-		SystemPrompt: defaultRunSystemPrompt,
+		SystemPrompt: systemPrompt,
 		Model:        selection.ModelConfig,
 		Compaction:   compaction.DefaultSettings(),
 		MaxTurns:     opts.MaxTurns,

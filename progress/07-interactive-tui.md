@@ -46,12 +46,13 @@ Current note:
 - the TUI `/model` picker is now implemented on top of the registry-backed selection path
 - the TUI recent-session picker is now implemented on top of `ListSessions(...)` through `/sessions` and `Ctrl-R`
 - tool lifecycle is now rendered as grouped transcript blocks in the TUI instead of flat request/result lines
-- grouped tool blocks are now width-capped and wrapped inside the viewport so long outputs do not mangle the transcript layout
+- grouped tool blocks are now width-capped and wrapped before printing so long outputs do not mangle transcript layout in terminal scrollback
 - the TUI now defaults to compact rendering, with `--debug` and `/debug` available when full tool args/output and verbose UI detail are needed
 - the first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`
 - built-in dark/light theme selection is now available through `--theme` and the TUI-local `/theme` picker
-- the transcript viewport now supports explicit history navigation through `PageUp` / `PageDown` and `Home` / `End`, and it no longer auto-snaps to bottom while the user is reading older output
-- Bubble Tea mouse capture is enabled again so transcript history and session pickers support wheel scrolling by default
+- the TUI transcript has been moved out of the Bubble Tea viewport and into terminal-native scrollback
+- session replay and finalized live transcript items now print into normal terminal history, while live assistant deltas stay in a bottom preview surface
+- terminal-native wheel scrolling, selection, and scrollback search are now preferred over app-owned transcript scrolling
 - `goose-go run /model` remains a local reporter, while `goose-go tui /model` now opens the picker
 - the next Stage 2 work now includes a dedicated styling/layout pass and a token-based theme plan inspired by `pi-mono`
 - the first slice from [07g-tui-markdown-rendering.md](/Users/rex/projects/goose-go/progress/07g-tui-markdown-rendering.md) is now implemented through `internal/tui/markdown`, with inline markdown rendering for assistant/system transcript text

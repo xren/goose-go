@@ -49,6 +49,10 @@ type fakeTraceWriter struct {
 	closed  bool
 }
 
+type capturePrinter struct {
+	blocks []string
+}
+
 func (f *fakeRuntime) LoadOrCreateSession(context.Context, string, string) (session.Session, int, error) {
 	if f.loadErr != nil {
 		return session.Session{}, 0, f.loadErr
@@ -159,6 +163,19 @@ func (f *fakeTraceWriter) Close() error {
 	return nil
 }
 
+func (c *capturePrinter) Cmd(blocks ...string) tea.Cmd {
+	c.blocks = append(c.blocks, blocks...)
+	return nil
+}
+
+func newCaptureModel(t *testing.T, runtime *fakeRuntime, opts Options) (model, *capturePrinter) {
+	t.Helper()
+	m := newModel(context.Background(), runtime, opts)
+	capture := &capturePrinter{}
+	m.printer = capture
+	return m, capture
+}
+
 func TestBuildTranscriptFromConversation(t *testing.T) {
 	msgTime := time.Now().UTC()
 	conv := conversation.Conversation{Messages: []conversation.Message{
@@ -186,25 +203,29 @@ func TestBuildTranscriptFromConversation(t *testing.T) {
 	}
 }
 
-func TestApplyAgentEventStreamsAssistantWithoutDuplicateFinalText(t *testing.T) {
-	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+func TestApplyAgentEventUsesPreviewAndPrintsFinalAssistantOnce(t *testing.T) {
+	m, printer := newCaptureModel(t, &fakeRuntime{}, Options{Debug: true})
 
-	m.applyAgentEvent(agent.Event{Type: agent.EventTypeProviderTextDelta, Delta: "pon"})
-	m.applyAgentEvent(agent.Event{Type: agent.EventTypeProviderTextDelta, Delta: "g"})
-	if got := len(m.items); got != 1 {
-		t.Fatalf("expected one live buffer item, got %d", got)
+	cmd := m.applyAgentEvent(agent.Event{Type: agent.EventTypeProviderTextDelta, Delta: "pon"})
+	if cmd != nil {
+		t.Fatal("did not expect print command for provider delta")
 	}
-	if m.items[0].Kind != kindLiveBuffer || m.items[0].Text != "pong" {
-		t.Fatalf("unexpected live buffer item: %#v", m.items[0])
+	_ = m.applyAgentEvent(agent.Event{Type: agent.EventTypeProviderTextDelta, Delta: "g"})
+	if m.liveAssistant != "pong" {
+		t.Fatalf("expected live preview buffer, got %q", m.liveAssistant)
+	}
+	if len(printer.blocks) != 0 {
+		t.Fatalf("did not expect printed output during delta streaming, got %#v", printer.blocks)
 	}
 
 	msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("pong"))
-	m.applyAgentEvent(agent.Event{Type: agent.EventTypeAssistantMessageComplete, Message: &msg})
-	if got := len(m.items); got != 1 {
-		t.Fatalf("expected one finalized assistant item, got %d", got)
+	cmd = m.applyAgentEvent(agent.Event{Type: agent.EventTypeAssistantMessageComplete, Message: &msg})
+	_ = cmd
+	if m.liveAssistant != "" {
+		t.Fatalf("expected live preview to clear, got %q", m.liveAssistant)
 	}
-	if m.items[0].Kind != kindAssistant || m.items[0].Text != "pong" {
-		t.Fatalf("unexpected final assistant item: %#v", m.items[0])
+	if !containsPrinted(printer.blocks, "pong") {
+		t.Fatalf("expected finalized assistant output to be printed, got %#v", printer.blocks)
 	}
 }
 
@@ -221,22 +242,20 @@ func TestLoadSessionCmdReplaysTranscript(t *testing.T) {
 		},
 	}
 
-	m := newModel(context.Background(), runtime, Options{SessionID: "sess_replay"})
+	m, printer := newCaptureModel(t, runtime, Options{SessionID: "sess_replay"})
 	msg := loadSessionCmd(context.Background(), runtime, "sess_replay")()
-	updated, _ := m.Update(msg)
-	got := updated.(model)
+	updated, cmd := m.Update(msg)
+	m = updated.(model)
+	_ = cmd
 
-	if got.sessionID != "sess_replay" {
-		t.Fatalf("expected session id to be loaded, got %q", got.sessionID)
+	if m.sessionID != "sess_replay" {
+		t.Fatalf("expected session id to be loaded, got %q", m.sessionID)
 	}
-	if got.workingDir != "/tmp/project" {
-		t.Fatalf("expected working dir to be loaded, got %q", got.workingDir)
+	if m.workingDir != "/tmp/project" {
+		t.Fatalf("expected working dir to be loaded, got %q", m.workingDir)
 	}
-	if len(got.items) != 2 {
-		t.Fatalf("expected 2 replayed transcript items, got %d", len(got.items))
-	}
-	if got.items[0].Text != "first" || got.items[1].Text != "second" {
-		t.Fatalf("unexpected replayed transcript: %#v", got.items)
+	if !containsPrinted(printer.blocks, "first") || !containsPrinted(printer.blocks, "second") {
+		t.Fatalf("expected replayed transcript to be printed, got %#v", printer.blocks)
 	}
 }
 
@@ -250,7 +269,7 @@ func TestLoadSessionCmdDetectsPendingApproval(t *testing.T) {
 		}},
 	}
 
-	m := newModel(context.Background(), runtime, Options{SessionID: "sess_pending"})
+	m, _ := newCaptureModel(t, runtime, Options{SessionID: "sess_pending"})
 	updated, _ := m.Update(loadSessionCmd(context.Background(), runtime, "sess_pending")())
 	m = updated.(model)
 
@@ -279,7 +298,7 @@ func TestStartRunCmdStreamsEventsAndWritesTrace(t *testing.T) {
 		},
 	}
 
-	m := newModel(context.Background(), runtime, Options{})
+	m, printer := newCaptureModel(t, runtime, Options{Debug: true})
 	startMsg := startRunCmd(context.Background(), runtime, m.async, "ping", "")()
 	updated, _ := m.Update(startMsg)
 	m = updated.(model)
@@ -289,11 +308,8 @@ func TestStartRunCmdStreamsEventsAndWritesTrace(t *testing.T) {
 
 	for range runtime.streamEvents {
 		msg := <-m.async
-		updated, cmd := m.Update(msg)
+		updated, _ = m.Update(msg)
 		m = updated.(model)
-		if cmd != nil {
-			_ = cmd
-		}
 	}
 
 	if m.status != "completed" {
@@ -308,26 +324,29 @@ func TestStartRunCmdStreamsEventsAndWritesTrace(t *testing.T) {
 	if !runtime.trace.closed {
 		t.Fatal("expected trace writer to be closed after completion")
 	}
-	if !containsText(m.items, "user", "ping") {
-		t.Fatalf("expected user message in transcript, got %#v", m.items)
-	}
-	if !containsText(m.items, "assistant", "pong") {
-		t.Fatalf("expected assistant message in transcript, got %#v", m.items)
+	if !containsPrinted(printer.blocks, "ping") || !containsPrinted(printer.blocks, "pong") {
+		t.Fatalf("expected printed user and assistant output, got %#v", printer.blocks)
 	}
 }
 
-func TestToolLifecycleAndInterruptUpdateState(t *testing.T) {
+func TestToolLifecycleAndInterruptPrintState(t *testing.T) {
 	trace := &fakeTraceWriter{}
-	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+	m, printer := newCaptureModel(t, &fakeRuntime{}, Options{Debug: true})
 	m.trace = trace
 	m.running = true
 	cancelled := false
 	m.cancelRun = func() { cancelled = true }
 
 	toolCall := toolCall("call_1", "shell", `{"command":"pwd"}`)
-	m.applyAgentEvent(agent.Event{Type: agent.EventTypeToolCallDetected, ToolCall: toolCall})
-	m.applyAgentEvent(agent.Event{Type: agent.EventTypeToolExecutionStarted, ToolCall: toolCall})
-	m.applyAgentEvent(agent.Event{Type: agent.EventTypeToolMessagePersisted, ToolCall: toolCall, ToolResult: toolResult("call_1", "/tmp/project")})
+	if cmd := m.applyAgentEvent(agent.Event{Type: agent.EventTypeToolCallDetected, ToolCall: toolCall}); cmd != nil {
+		_ = cmd
+	}
+	if cmd := m.applyAgentEvent(agent.Event{Type: agent.EventTypeToolExecutionStarted, ToolCall: toolCall}); cmd != nil {
+		_ = cmd
+	}
+	if cmd := m.applyAgentEvent(agent.Event{Type: agent.EventTypeToolMessagePersisted, ToolCall: toolCall, ToolResult: toolResult("call_1", "/tmp/project")}); cmd != nil {
+		_ = cmd
+	}
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	m = updated.(model)
@@ -338,12 +357,14 @@ func TestToolLifecycleAndInterruptUpdateState(t *testing.T) {
 		t.Fatalf("expected interrupting status, got %q", m.status)
 	}
 
-	m.applyAgentEvent(agent.Event{Type: agent.EventTypeRunInterrupted, Err: context.Canceled})
+	if cmd := m.applyAgentEvent(agent.Event{Type: agent.EventTypeRunInterrupted, Err: context.Canceled}); cmd != nil {
+		_ = cmd
+	}
 	if m.status != "interrupted" {
 		t.Fatalf("expected interrupted status, got %q", m.status)
 	}
-	if !containsText(m.items, "tool[shell]", "status: completed") || !containsText(m.items, "tool[shell]", "/tmp/project") {
-		t.Fatalf("expected grouped tool item, got %#v", m.items)
+	if !containsPrinted(printer.blocks, "/tmp/project") {
+		t.Fatalf("expected tool result in printed output, got %#v", printer.blocks)
 	}
 	if !trace.closed {
 		t.Fatal("expected trace to be closed after interruption")
@@ -362,7 +383,7 @@ func TestApprovalKeyApproveStartsContinuation(t *testing.T) {
 			{Type: agent.EventTypeRunCompleted, SessionID: "sess_pending", Result: &agent.Result{Status: agent.StatusCompleted}},
 		},
 	}
-	m := newModel(context.Background(), runtime, Options{})
+	m, printer := newCaptureModel(t, runtime, Options{Debug: true})
 	m.sessionID = "sess_pending"
 	m.workingDir = "/tmp/project"
 	m.status = "awaiting approval"
@@ -391,8 +412,8 @@ func TestApprovalKeyApproveStartsContinuation(t *testing.T) {
 	if m.approval.Request != nil {
 		t.Fatalf("expected approval panel to clear, got %#v", m.approval)
 	}
-	if !containsText(m.items, "tool[shell]", "status: completed") || !containsText(m.items, "tool[shell]", "/tmp/project") || !containsText(m.items, "assistant", "done") {
-		t.Fatalf("expected continued transcript, got %#v", m.items)
+	if !containsPrinted(printer.blocks, "/tmp/project") || !containsPrinted(printer.blocks, "done") {
+		t.Fatalf("expected continuation output, got %#v", printer.blocks)
 	}
 }
 
@@ -407,7 +428,7 @@ func TestApprovalKeyDenyStartsContinuation(t *testing.T) {
 			{Type: agent.EventTypeRunCompleted, SessionID: "sess_pending", Result: &agent.Result{Status: agent.StatusCompleted}},
 		},
 	}
-	m := newModel(context.Background(), runtime, Options{})
+	m, printer := newCaptureModel(t, runtime, Options{Debug: true})
 	m.sessionID = "sess_pending"
 	m.status = "awaiting approval"
 	m.approval.Request = &agent.ApprovalRequest{SessionID: "sess_pending", ToolCall: tools.Call{ID: "call_1", Name: "shell", Arguments: json.RawMessage(`{"command":"pwd"}`)}}
@@ -426,8 +447,8 @@ func TestApprovalKeyDenyStartsContinuation(t *testing.T) {
 	if m.status != "completed" {
 		t.Fatalf("expected completed status, got %q", m.status)
 	}
-	if !containsText(m.items, "tool[shell]", "status: error") || !containsText(m.items, "tool[shell]", "tool execution denied by user") {
-		t.Fatalf("expected denied tool result in transcript, got %#v", m.items)
+	if !containsPrinted(printer.blocks, "tool execution denied by user") {
+		t.Fatalf("expected denied tool result in printed output, got %#v", printer.blocks)
 	}
 }
 
@@ -448,7 +469,7 @@ func TestEnterModelCommandOpensPicker(t *testing.T) {
 			{Model: models.ModelSpec{Provider: models.ProviderOpenAICodex, ID: models.ModelGPT53Codex, DisplayName: "GPT-5.3 Codex"}, Available: true},
 		},
 	}
-	m := newModel(context.Background(), runtime, Options{})
+	m, _ := newCaptureModel(t, runtime, Options{})
 	m.input.SetValue("/model")
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -482,7 +503,7 @@ func TestModelPickerSelectsModelAndPersistsSession(t *testing.T) {
 			{Model: models.ModelSpec{Provider: models.ProviderOpenAICodex, ID: models.ModelGPT53Codex, DisplayName: "GPT-5.3 Codex"}, Available: true},
 		},
 	}
-	m := newModel(context.Background(), runtime, Options{})
+	m, printer := newCaptureModel(t, runtime, Options{})
 	m.sessionID = "sess_model"
 	m.picker = modelPickerState{Open: true, Items: runtime.availableModels, Selected: 1}
 
@@ -503,8 +524,8 @@ func TestModelPickerSelectsModelAndPersistsSession(t *testing.T) {
 	if runtime.lastSetSessionID != "sess_model" {
 		t.Fatalf("expected session id to be persisted, got %q", runtime.lastSetSessionID)
 	}
-	if !containsText(m.items, "system", "selected model: gpt-5.3-codex") {
-		t.Fatalf("expected local selection output in transcript, got %#v", m.items)
+	if !containsPrinted(printer.blocks, "selected model: gpt-5.3-codex") {
+		t.Fatalf("expected selection output to be printed, got %#v", printer.blocks)
 	}
 }
 
@@ -518,7 +539,7 @@ func TestModelPickerUnavailableModelShowsReason(t *testing.T) {
 			},
 		},
 	}
-	m := newModel(context.Background(), runtime, Options{})
+	m, _ := newCaptureModel(t, runtime, Options{})
 	m.picker = modelPickerState{Open: true, Items: runtime.availableModels}
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -538,7 +559,7 @@ func TestSessionsCommandOpensPicker(t *testing.T) {
 			{ID: "sess_old", Name: "Older session", WorkingDir: "/tmp/old", Provider: "openai-codex", Model: "gpt-5.3-codex", MessageCount: 8},
 		},
 	}
-	m := newModel(context.Background(), runtime, Options{})
+	m, _ := newCaptureModel(t, runtime, Options{})
 	m.input.SetValue("/sessions")
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -588,9 +609,9 @@ func toolErrorResult(id, text string) *tools.Result {
 	}
 }
 
-func containsText(items []transcriptItem, prefix string, text string) bool {
-	for _, item := range items {
-		if item.Prefix == prefix && strings.Contains(item.Text, text) {
+func containsPrinted(blocks []string, text string) bool {
+	for _, block := range blocks {
+		if strings.Contains(block, text) {
 			return true
 		}
 	}

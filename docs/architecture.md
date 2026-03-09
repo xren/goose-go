@@ -47,7 +47,7 @@ These packages define the intended shape of the system. They are architectural t
 - `internal/evals`
   Smoke tests, task evals, regression harness.
 - `internal/tui`
-  Bubble Tea frontend, event adapter, transcript state, and interactive terminal rendering.
+  Bubble Tea frontend, event adapter, terminal-native transcript printing, and interactive terminal rendering.
 - `internal/tui/markdown`
   Inline markdown rendering for assistant/system transcript content, with width-aware styled wrapping.
 - `internal/tui/theme`
@@ -118,6 +118,7 @@ This reflects the current system shape:
 - `session.Store` is the persistence seam used by both app and agent.
 - `internal/compaction` is a real runtime subsystem behind the agent loop, not just future scaffolding.
 - provider, tools, auth, and storage stay behind their package boundaries.
+- `internal/prompt` now owns base run-prompt composition and eager `AGENTS.md` loading instead of leaving system prompt assembly in `internal/app`.
 - `internal/agent` owns the live event stream that both `run` and `tui` consume today.
 - `cmd/goose-go run` now renders from that stream through `internal/app`, rather than waiting for a completed transcript.
 - `cmd/goose-go tui` now uses the same `internal/app.OpenRuntime` path and consumes `ReplyStream(...)` through `internal/tui`.
@@ -159,8 +160,9 @@ The root architecture doc defines package-level boundaries. Concrete subsystem b
 - [internal/compaction/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/compaction/ARCHITECTURE.md): compaction planning, cut-point selection, and active-context reconstruction
 - [internal/session/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/session/ARCHITECTURE.md): session store contract, summaries, and SQLite boundary
 - [internal/tools/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tools/ARCHITECTURE.md): tool contract, registry, execution flow, and the first concrete `shell` tool
+- [internal/prompt/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/prompt/ARCHITECTURE.md): base system prompt composition and local `AGENTS.md` loading
 - [internal/evals/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/evals/ARCHITECTURE.md): deterministic eval harness over real runtime boundaries and trace assertions
-- [internal/tui/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/ARCHITECTURE.md): Bubble Tea frontend, runtime bridge, and transcript state model over the live agent event stream
+- [internal/tui/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/ARCHITECTURE.md): Bubble Tea frontend, runtime bridge, and terminal-native scrollback model over the live agent event stream
 - [internal/tui/markdown/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/markdown/ARCHITECTURE.md): inline markdown rendering for assistant/system transcript content
 - [internal/tui/theme/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/theme/ARCHITECTURE.md): semantic TUI theme tokens, built-in dark/light palettes, and theme selection boundaries
 

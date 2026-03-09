@@ -105,10 +105,18 @@ func (a *Agent) processToolCalls(
 }
 
 func (a *Agent) approvalDecision(ctx context.Context, sessionID string, call tools.Call) (ApprovalDecision, *tools.Call, error) {
+	def, err := a.tools.Definition(call.Name)
+	if err != nil {
+		return "", nil, fmt.Errorf("tool metadata: %w", err)
+	}
+
 	switch a.config.ApprovalMode {
 	case ApprovalModeAuto:
 		return ApprovalDecisionAllow, nil, nil
 	case ApprovalModeApprove:
+		if def.ApprovalDefault == tools.ApprovalDefaultAllow {
+			return ApprovalDecisionAllow, nil, nil
+		}
 		if a.approver == nil {
 			pending := call
 			return "", &pending, nil

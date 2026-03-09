@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"strconv"
 	"strings"
 	"testing"
@@ -30,7 +29,7 @@ func TestSessionPickerLoadsSelectedSession(t *testing.T) {
 			}},
 		},
 	}
-	m := newModel(context.Background(), runtime, Options{})
+	m, printer := newCaptureModel(t, runtime, Options{})
 	m.sessions = sessionPickerState{Open: true, Items: runtime.sessionSummaries, Selected: 1}
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -38,8 +37,9 @@ func TestSessionPickerLoadsSelectedSession(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected load selected session command")
 	}
-	updated, _ = m.Update(cmd())
+	updated, cmd = m.Update(cmd())
 	m = updated.(model)
+	_ = cmd
 
 	if m.sessions.Open {
 		t.Fatal("expected sessions picker to close after load")
@@ -47,81 +47,8 @@ func TestSessionPickerLoadsSelectedSession(t *testing.T) {
 	if m.sessionID != "sess_b" {
 		t.Fatalf("expected session id sess_b, got %q", m.sessionID)
 	}
-	if !containsText(m.items, "user", "resume me") {
-		t.Fatalf("expected replayed transcript, got %#v", m.items)
-	}
-}
-
-func TestSessionPickerMouseWheelMovesSelection(t *testing.T) {
-	runtime := &fakeRuntime{
-		sessionSummaries: []session.Summary{
-			{ID: "sess_a", Name: "A"},
-			{ID: "sess_b", Name: "B"},
-			{ID: "sess_c", Name: "C"},
-		},
-	}
-	m := newModel(context.Background(), runtime, Options{})
-	m.sessions = sessionPickerState{Open: true, Items: runtime.sessionSummaries, Selected: 1}
-
-	updated, _ := m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelUp, Action: tea.MouseActionPress})
-	m = updated.(model)
-	if m.sessions.Selected != 0 {
-		t.Fatalf("expected wheel up to move selection to 0, got %d", m.sessions.Selected)
-	}
-
-	updated, _ = m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
-	m = updated.(model)
-	if m.sessions.Selected != 1 {
-		t.Fatalf("expected wheel down to move selection back to 1, got %d", m.sessions.Selected)
-	}
-}
-
-func TestSessionPickerLoadRestoresViewportHeight(t *testing.T) {
-	msgTime := time.Now().UTC()
-	summaries := make([]session.Summary, 12)
-	for i := range summaries {
-		summaries[i] = session.Summary{
-			ID:         "sess_" + strconv.Itoa(i),
-			Name:       "Session " + strconv.Itoa(i),
-			WorkingDir: "/tmp/project",
-			Provider:   "openai-codex",
-			Model:      "gpt-5-codex",
-		}
-	}
-
-	runtime := &fakeRuntime{
-		sessionSummaries: summaries,
-		replay: session.Session{
-			ID:         "sess_3",
-			WorkingDir: "/tmp/project",
-			Provider:   "openai-codex",
-			Model:      "gpt-5-codex",
-			Conversation: conversation.Conversation{Messages: []conversation.Message{
-				{ID: "m1", Role: conversation.RoleUser, CreatedAt: msgTime, Content: []conversation.Content{conversation.Text("resume me")}},
-			}},
-		},
-	}
-
-	m := newModel(context.Background(), runtime, Options{})
-	m.width = 120
-	m.height = 40
-	m.sessions = sessionPickerState{Open: true, Items: summaries, Selected: 3}
-	m.layout()
-	heightWithPicker := m.viewport.Height
-
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = updated.(model)
-	if cmd == nil {
-		t.Fatal("expected load selected session command")
-	}
-	updated, _ = m.Update(cmd())
-	m = updated.(model)
-
-	if m.sessions.Open {
-		t.Fatal("expected sessions picker to close after load")
-	}
-	if m.viewport.Height <= heightWithPicker {
-		t.Fatalf("expected viewport height to grow after picker closes, before=%d after=%d", heightWithPicker, m.viewport.Height)
+	if !containsPrinted(printer.blocks, "resume me") {
+		t.Fatalf("expected replayed transcript, got %#v", printer.blocks)
 	}
 }
 
@@ -138,7 +65,7 @@ func TestSessionPickerPanelShowsWindowedItems(t *testing.T) {
 		}
 	}
 
-	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+	m, _ := newCaptureModel(t, &fakeRuntime{}, Options{})
 	m.width = 120
 	m.height = 20
 	m.sessions = sessionPickerState{Open: true, Items: summaries, Selected: 10}

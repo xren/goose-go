@@ -19,28 +19,42 @@ The package must stay independent from provider HTTP formats and storage impleme
 
 ```mermaid
 flowchart LR
-    A["agent/runtime (future)"] --> B["internal/tools.Registry"]
-    B --> C["lookup by tool name"]
-    C --> D["Tool implementation"]
+    A["agent/runtime"] --> B["internal/tools.Registry"]
+    B --> C["tool definitions exposed to provider"]
+    B --> D["tool execution dispatch"]
+    B --> E["tool metadata lookup"]
 
-    D --> E["Definition()"]
-    D --> F["Run(ctx, Call)"]
+    D --> F["primitive read tools"]
+    D --> G["primitive write/exec tools"]
+    D --> H["extension tools (later)"]
 
-    F --> G["validate input args"]
-    G --> H["execute tool logic"]
+    F --> F1["read_file"]
+    F --> F2["list_dir"]
+    F --> F3["find_files"]
+    F --> F4["grep"]
+    F --> F5["fetch_url"]
 
-    H --> I["tools.Result"]
-    I --> J["ToConversationContent()"]
-    J --> K["conversation.ToolResponse"]
+    G --> G1["write_file"]
+    G --> G2["edit_file"]
+    G --> G3["shell"]
 
-    subgraph Current
-      D1["internal/tools/shell"]
-    end
+    H --> H1["MCP-backed tools"]
+    H --> H2["browser automation"]
+    H --> H3["custom external tools"]
 
-    C --> D1
-    D1 --> H1["/bin/sh -lc command"]
-    H1 --> I1["stdout/stderr + exit_code + is_error"]
-    I1 --> I
+    E --> I["Definition.Capability"]
+    E --> J["Definition.ApprovalDefault"]
+
+    I --> I1["read"]
+    I --> I2["write"]
+    I --> I3["exec"]
+    I --> I4["extension"]
+
+    J --> J1["allow"]
+    J --> J2["ask"]
+
+    D --> K["structured tool results"]
+    K --> L["agent events / traces / TUI"]
 ```
 
 ## Core Types
@@ -48,27 +62,73 @@ flowchart LR
 - `Tool`
   The runtime contract. Each tool exposes metadata through `Definition()` and executes through `Run(ctx, Call)`.
 - `Definition`
-  The tool name, description, and JSON schema-like input metadata exposed to the runtime and later to the provider layer.
+  The tool name, description, input schema, capability class, and default approval policy exposed to the runtime and later to the provider layer.
 - `Call`
   The normalized invocation shape. It carries the tool name, raw JSON arguments, and runtime execution defaults such as the session working directory.
 - `Result`
   The normalized output shape. It carries structured data plus a conversion path back into conversation content.
 - `Registry`
-  The in-process index of available tools. It owns registration, lookup, listing, and dispatch by tool name.
+  The in-process index of available tools. It owns registration, lookup, listing, metadata access, and dispatch by tool name.
+
+## Capability Metadata
+
+Capability metadata is attached directly to each tool definition. It is not a separate registry or policy service.
+
+Current metadata model:
+
+- `Definition.Capability`
+  Classifies the tool as `read`, `write`, `exec`, or later `extension`.
+- `Definition.ApprovalDefault`
+  Declares whether the tool should default to `allow` or `ask` when the runtime is in approval mode.
+
+This keeps the source of truth next to the tool implementation:
+
+- the concrete tool returns its `Definition()`
+- the registry stores that definition alongside the tool
+- the agent reads the stored definition when deciding approval behavior in approval mode
+
+The first shipped example is `shell`, which is registered as:
+
+- capability: `exec`
+- approval default: `ask`
 
 ## Current Implementation
 
-The first concrete tool is `internal/tools/shell`.
+The first concrete tools are:
 
-It intentionally stays narrow:
+- `internal/tools/fetchurl`
+- `internal/tools/findfiles`
+- `internal/tools/grep`
+- `internal/tools/listdir`
+- `internal/tools/readfile`
+- `internal/tools/shell`
+
+The primitive read-tool baseline is now in place:
+
+- `fetch_url`
+  bounded read-only HTTP fetch for docs and simple web pages
+- `find_files`
+  recursive filename search with glob-or-substring matching
+- `grep`
+  recursive text search with regular expressions
+- `list_dir`
+  directory listing with bounded entry counts
+- `read_file`
+  bounded UTF-8 file reads with truncation metadata
+
+`shell` stays intentionally narrow:
 
 - local execution only
 - synchronous execution
 - `/bin/sh -lc` command dispatch
 - default execution in the session working directory when the model does not provide `working_dir`
 - structured result with stdout, stderr, exit code, and error state
+- capability metadata of `exec + ask`
 
-This establishes the result shape and execution path for later tools such as `write`, `edit`, and `tree`.
+Together they establish both sides of the capability model:
+
+- read tools can default to autonomous execution
+- exec tools stay explicit and approval-gated
 
 ## Boundary Rules
 
@@ -77,20 +137,21 @@ This establishes the result shape and execution path for later tools such as `wr
 - Tool execution results must be normalized before they leave the tools layer.
 - Storage concerns stay outside the tools package.
 - The agent loop should orchestrate tools, not reimplement tool validation or dispatch logic.
+- Permission policy should be derived from tool metadata, not inferred from shell command text or tool names elsewhere in the runtime.
 
 ## Near-Term Growth
 
 The next planned tools are:
 
-- `write`
-- `edit`
-- `tree`
+- `write_file`
+- `edit_file`
 
 They should follow the same pattern:
 
 - declare a stable `Definition`
+- declare explicit capability and approval metadata
 - validate a normalized `Call`
 - execute locally
 - return a structured `Result`
 
-The goal for Milestone 03 is not tool breadth. The goal is to establish one clean tool runtime that the later agent loop can rely on without redesign.
+The goal is one clean tool runtime that the agent can rely on without hidden policy tables or ad hoc permission rules.

@@ -19,9 +19,8 @@ import (
 )
 
 const (
-	defaultRunSystemPrompt = "You are a concise terminal coding assistant. Use the shell tool when it is the clearest way to inspect or modify the local environment."
-	defaultRunDBDir        = ".goose-go"
-	defaultRunDBName       = "sessions.db"
+	defaultRunDBDir  = ".goose-go"
+	defaultRunDBName = "sessions.db"
 )
 
 var ErrInterrupted = errors.New("interrupted")

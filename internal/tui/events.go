@@ -3,89 +3,118 @@ package tui
 import (
 	"fmt"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"goose-go/internal/agent"
 	"goose-go/internal/conversation"
 )
 
-func (m *model) applyAgentEvent(event agent.Event) {
+func (m *model) applyAgentEvent(event agent.Event) tea.Cmd {
 	m.applyTrace(event)
 
 	switch event.Type {
 	case agent.EventTypeRunStarted:
 		m.status = "running"
+		return nil
 	case agent.EventTypeUserMessagePersisted:
 		if event.Message != nil {
-			appendMessageItems(&m.items, *event.Message)
+			return m.printMessageCmd(*event.Message)
 		}
+		return nil
 	case agent.EventTypeProviderTextDelta:
-		m.upsertLiveAssistant(event.Delta)
+		m.liveAssistant += event.Delta
+		return nil
 	case agent.EventTypeAssistantMessageComplete:
-		m.clearLiveAssistant()
+		m.liveAssistant = ""
 		if event.Message != nil {
-			appendMessageItems(&m.items, *event.Message)
+			return m.printMessageCmd(*event.Message)
 		}
+		return nil
 	case agent.EventTypeToolCallDetected:
 		if event.ToolCall != nil {
-			upsertToolGroup(&m.items, *event.ToolCall, "requested")
+			upsertToolGroup(&m.activeTools, *event.ToolCall, "requested")
+			if idx := findToolGroup(m.activeTools, event.ToolCall.ID); idx >= 0 {
+				return m.printItemsCmd([]transcriptItem{m.activeTools[idx]})
+			}
 		}
+		return nil
 	case agent.EventTypeToolExecutionStarted:
 		if event.ToolCall != nil {
-			markToolGroupRunning(&m.items, *event.ToolCall)
+			markToolGroupRunning(&m.activeTools, *event.ToolCall)
 		}
+		return nil
 	case agent.EventTypeToolMessagePersisted:
-		if event.ToolResult != nil {
-			if event.ToolCall != nil && findToolGroup(m.items, event.ToolCall.ID) < 0 {
-				upsertToolGroup(&m.items, *event.ToolCall, "requested")
-			}
-			response := conversation.ToolResponseContent{
-				ID:      event.ToolResult.ToolCallID,
-				IsError: event.ToolResult.IsError,
-				Content: event.ToolResult.Content,
-			}
-			upsertToolResult(&m.items, response)
+		if event.ToolResult == nil {
+			return nil
 		}
+		if event.ToolCall != nil && findToolGroup(m.activeTools, event.ToolCall.ID) < 0 {
+			upsertToolGroup(&m.activeTools, *event.ToolCall, "requested")
+		}
+		response := conversation.ToolResponseContent{
+			ID:      event.ToolResult.ToolCallID,
+			IsError: event.ToolResult.IsError,
+			Content: event.ToolResult.Content,
+		}
+		upsertToolResult(&m.activeTools, response)
+		if idx := findToolGroup(m.activeTools, response.ID); idx >= 0 {
+			item := m.activeTools[idx]
+			m.activeTools = removeToolGroup(m.activeTools, response.ID)
+			return m.printItemsCmd([]transcriptItem{item})
+		}
+		return nil
 	case agent.EventTypeCompactionStarted:
-		m.items = append(m.items, transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("compacting context (%s, %d tokens)", event.CompactionReason, event.TokensBefore)})
+		return m.printSystemCmd(fmt.Sprintf("compacting context (%s, %d tokens)", event.CompactionReason, event.TokensBefore))
 	case agent.EventTypeCompactionCompleted:
-		m.items = append(m.items, transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("compaction complete (%s)", event.CompactionReason)})
+		return m.printSystemCmd(fmt.Sprintf("compaction complete (%s)", event.CompactionReason))
 	case agent.EventTypeCompactionFailed:
-		m.items = append(m.items, transcriptItem{Kind: kindError, Prefix: "system", Text: fmt.Sprintf("compaction failed (%s)", event.CompactionReason)})
+		return m.printErrorCmd(fmt.Sprintf("compaction failed (%s)", event.CompactionReason))
 	case agent.EventTypeApprovalRequired:
 		m.status = "awaiting approval"
 		m.running = false
 		m.cancelRun = nil
+		m.liveAssistant = ""
 		m.approval = approvalViewState{Request: event.ApprovalRequest}
+		return nil
 	case agent.EventTypeApprovalResolved:
 		m.approval.Busy = false
 		m.approval.Err = ""
 		m.approval.Request = nil
+		return nil
 	case agent.EventTypeRunCompleted:
+		m.liveAssistant = ""
 		if event.Result != nil && event.Result.Status == agent.StatusAwaitingApproval {
 			m.finishRun("awaiting approval")
 		} else {
 			m.finishRun(runtimeResultStatus(event.Result))
 		}
+		return nil
 	case agent.EventTypeRunInterrupted:
-		m.items = append(m.items, transcriptItem{Kind: kindSystem, Prefix: "system", Text: "interrupted"})
+		m.liveAssistant = ""
 		m.finishRun("interrupted")
+		return m.printSystemCmd("interrupted")
 	case agent.EventTypeRunFailed:
-		m.items = append(m.items, transcriptItem{Kind: kindError, Prefix: "error", Text: errorText(event.Err)})
+		m.liveAssistant = ""
 		m.finishRun("failed")
+		return m.printErrorCmd(errorText(event.Err))
+	default:
+		return nil
 	}
-	m.layout()
-	m.syncViewport(false)
 }
 
-func (m *model) upsertLiveAssistant(delta string) {
-	if len(m.items) > 0 && m.items[len(m.items)-1].Kind == kindLiveBuffer {
-		m.items[len(m.items)-1].Text += delta
-		return
+func removeToolGroup(items []transcriptItem, callID string) []transcriptItem {
+	index := findToolGroup(items, callID)
+	if index < 0 {
+		return items
 	}
-	m.items = append(m.items, transcriptItem{Kind: kindLiveBuffer, Prefix: "assistant", Text: delta})
+	out := make([]transcriptItem, 0, len(items)-1)
+	out = append(out, items[:index]...)
+	out = append(out, items[index+1:]...)
+	return out
 }
 
-func (m *model) clearLiveAssistant() {
-	if len(m.items) > 0 && m.items[len(m.items)-1].Kind == kindLiveBuffer {
-		m.items = m.items[:len(m.items)-1]
+func waitWith(cmd tea.Cmd, async <-chan tea.Msg) tea.Cmd {
+	if cmd == nil {
+		return waitForAsync(async)
 	}
+	return tea.Batch(cmd, waitForAsync(async))
 }

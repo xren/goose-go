@@ -13,12 +13,12 @@ func TestRegistryRegisterAndDefinitions(t *testing.T) {
 	registry := NewRegistry()
 
 	if err := registry.Register(toolStub{
-		definition: Definition{Name: "b", Description: "second"},
+		definition: Definition{Name: "b", Description: "second", Capability: CapabilityRead, ApprovalDefault: ApprovalDefaultAllow},
 	}); err != nil {
 		t.Fatalf("register tool b: %v", err)
 	}
 	if err := registry.Register(toolStub{
-		definition: Definition{Name: "a", Description: "first"},
+		definition: Definition{Name: "a", Description: "first", Capability: CapabilityExec, ApprovalDefault: ApprovalDefaultAsk},
 	}); err != nil {
 		t.Fatalf("register tool a: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestRegistryRegisterAndDefinitions(t *testing.T) {
 
 func TestRegistryRejectsDuplicateTool(t *testing.T) {
 	registry := NewRegistry()
-	tool := toolStub{definition: Definition{Name: "shell"}}
+	tool := toolStub{definition: Definition{Name: "shell", Capability: CapabilityExec, ApprovalDefault: ApprovalDefaultAsk}}
 
 	if err := registry.Register(tool); err != nil {
 		t.Fatalf("register tool: %v", err)
@@ -47,7 +47,7 @@ func TestRegistryRejectsDuplicateTool(t *testing.T) {
 func TestRegistryExecute(t *testing.T) {
 	registry := NewRegistry()
 	if err := registry.Register(toolStub{
-		definition: Definition{Name: "shell"},
+		definition: Definition{Name: "shell", Capability: CapabilityExec, ApprovalDefault: ApprovalDefaultAsk},
 		result: Result{
 			ToolCallID: "call_1",
 			Content:    []conversation.ToolResult{{Type: "text", Text: "ok"}},
@@ -78,6 +78,31 @@ func TestRegistryExecuteUnknownTool(t *testing.T) {
 	})
 	if !errors.Is(err, ErrToolNotFound) {
 		t.Fatalf("expected tool not found, got %v", err)
+	}
+}
+
+func TestRegistryDefinitionReturnsStoredMetadata(t *testing.T) {
+	registry := NewRegistry()
+	if err := registry.Register(toolStub{
+		definition: Definition{
+			Name:            "read_file",
+			Description:     "Read a file from disk.",
+			Capability:      CapabilityRead,
+			ApprovalDefault: ApprovalDefaultAllow,
+		},
+	}); err != nil {
+		t.Fatalf("register tool: %v", err)
+	}
+
+	def, err := registry.Definition("read_file")
+	if err != nil {
+		t.Fatalf("definition lookup: %v", err)
+	}
+	if def.Capability != CapabilityRead {
+		t.Fatalf("expected read capability, got %q", def.Capability)
+	}
+	if def.ApprovalDefault != ApprovalDefaultAllow {
+		t.Fatalf("expected allow approval default, got %q", def.ApprovalDefault)
 	}
 }
 

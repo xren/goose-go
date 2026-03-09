@@ -42,6 +42,8 @@ func (Tool) Definition() tools.Definition {
   "required": ["command"],
   "additionalProperties": false
 }`),
+		Capability:      tools.CapabilityExec,
+		ApprovalDefault: tools.ApprovalDefaultAsk,
 	}
 }
 

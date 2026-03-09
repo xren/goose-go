@@ -36,8 +36,9 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - Session persistence of provider/model is now implemented, and resumed sessions reuse that selection by default.
 - The TUI `/model` picker is now implemented on top of the registry-backed selection path.
 - The TUI recent-session picker is now implemented on top of `ListSessions(...)`, exposed through `/sessions` and `Ctrl-R`.
-- The recent-session picker now has its own scrollable window and consumes `PageUp` / `PageDown`, `Home`, and `End` for long session lists.
-- The TUI transcript now supports explicit history navigation with `PageUp`/`PageDown` and `Home`/`End`, and it no longer auto-snaps to bottom while the user is reading older output.
+- The recent-session picker now uses a keyboard-driven windowed list and consumes `PageUp` / `PageDown`, `Home`, and `End` for long session lists.
+- The TUI has been refactored to use terminal-native scrollback instead of a Bubble Tea viewport for transcript history.
+- Session replay and finalized live transcript output now print into terminal scrollback, while the Bubble Tea surface stays focused on composer, status, approval, and pickers.
 - The TUI now uses a transcript-first layout: session/model/cwd/status metadata render in the lower control area instead of occupying the top of the screen.
 - Human messages in the TUI now render with a subdued gray background bubble instead of plain foreground-only text.
 - Human message bubbles now span the full transcript width with fixed horizontal padding instead of hugging only the text width.
@@ -47,8 +48,9 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - The TUI now defaults to compact rendering, with `--debug` and `/debug` available when full tool args/output and verbose UI detail are needed.
 - The first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`.
 - Built-in dark/light TUI themes are now implemented through `internal/tui/theme`, exposed via `goose-go tui --theme <name>` and the local `/theme` picker.
-- Bubble Tea mouse capture is now disabled in the TUI so transcript text can always be highlighted and copied with normal terminal selection behavior.
+- The TUI now runs in normal screen mode without alt-screen or transcript mouse capture, so terminal-native scrolling, selection, and scrollback search work again.
 - The first markdown-rendering slice from [progress/07g-tui-markdown-rendering.md](/Users/rex/projects/goose-go/progress/07g-tui-markdown-rendering.md) is now implemented: `internal/tui/markdown` uses `goldmark`, theme-driven inline styling, and width-aware wrapping for assistant/system transcript text.
+- `internal/prompt` now exists as a concrete runtime package: `goose-go run` and `goose-go tui` eagerly load local `AGENTS.md` files from the working directory up to the git root and append them to the system prompt as project context.
 - The root architecture diagram in [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md) is now synced to the current runtime shape, including `internal/app`, `internal/models`, `internal/compaction`, trace writing, and the live TUI/event-stream path.
 - The default runtime max-turn limit is now 10000 instead of 8, so long CLI and TUI sessions do not stop early under normal use.
 - `goose-go run /model` remains a local reporter, while `goose-go tui /model` now opens the registry-backed picker.
@@ -87,6 +89,10 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - Stage 1 TUI coverage now includes reducer and scripted smoke tests for replay, run start, streamed assistant output, tool activity, and interrupt behavior.
 - The manual TUI runbook now lives in [README.md](/Users/rex/projects/goose-go/README.md).
 - The next TUI work is Stage 2 UX expansion.
+- A dedicated primitive-tool and permission rollout plan now exists in [progress/08-primitive-tools-and-extension-strategy.md](/Users/rex/projects/goose-go/progress/08-primitive-tools-and-extension-strategy.md).
+- The primitive-tool rollout plan is now in progress: tool definitions carry capability and default-approval metadata, the registry stores that metadata alongside each tool, and the agent approval path now reads approval defaults from the registry instead of relying on tool-name conventions.
+- The first primitive read tool, `read_file`, is now implemented and registered in the main runtime as `read + allow`, which proves the metadata-driven permission path end to end.
+- The full Phase 1 primitive read-tool baseline is now implemented in the main runtime: `read_file`, `list_dir`, `find_files`, `grep`, and `fetch_url` all run as `read + allow`.
 - Stage 2 planning now explicitly treats approval as a runtime/app integration problem before it becomes a TUI modal problem.
 - Keep `docs/design-principles.md` as the default design checklist for new feature work and architecture changes.
 - The first concrete provider is documented in `internal/provider/openaicodex/ARCHITECTURE.md` so fresh agents can understand the provider shape without reading implementation first.

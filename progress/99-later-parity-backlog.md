@@ -40,6 +40,7 @@ none
 - [ ] Evaluate websocket transport for the Codex provider
 - [ ] Evaluate generic OpenAI API-key provider support after the Codex-first slice is stable
 - [ ] Revisit whether `write`, `edit`, and `tree` are needed after the first agent-loop milestone
+- [ ] Revisit broader Goose-style context loading beyond local `AGENTS.md`, including `.goosehints`, configurable context file names, global hints, and `@file` expansion
 - [ ] Revisit advanced TUI features such as slash commands, queued messages, tree view, overlays, and richer theming after the minimal TUI lands
 - [ ] Revisit recipes once terminal core is stable
 - [ ] Evaluate MCP transport support after in-process tools are solid
@@ -61,7 +62,9 @@ none
 ## Notes / Findings
 
 - This file is explicitly non-v1.
+- Primitive built-in tool rollout is now tracked separately in [08-primitive-tools-and-extension-strategy.md](/Users/rex/projects/goose-go/progress/08-primitive-tools-and-extension-strategy.md); this backlog should focus on broader parity and extension breadth rather than first-party primitive-tool basics.
 - V1 intentionally reuses existing `codex login` state from `~/.codex/auth.json`.
 - Broader provider and auth surface area is intentionally deferred.
 - Structured file tools beyond `shell` are intentionally deferred until the agent loop demonstrates a need for tighter permissions or better observability.
+- Only the narrow local `AGENTS.md` prompt-loading slice is implemented today; broader Goose-compatible hint loading remains deferred.
 - Advanced TUI features should come only after the runtime is event-driven and the minimal interactive shell is stable.

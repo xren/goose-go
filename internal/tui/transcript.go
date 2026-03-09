@@ -62,20 +62,12 @@ func appendMessageItems(items *[]transcriptItem, message conversation.Message) {
 	}
 }
 
-func renderItems(theme tuitheme.Palette, items []transcriptItem, width int, showToolDetails bool) string {
-	lines := make([]string, 0, len(items))
-	for _, item := range items {
-		lines = append(lines, renderItem(theme, item, width, showToolDetails))
-	}
-	return strings.Join(lines, "\n")
-}
-
 func renderItem(theme tuitheme.Palette, item transcriptItem, width int, showToolDetails bool) string {
 	text := strings.TrimRight(item.Text, "\n")
 	switch item.Kind {
 	case kindUser:
 		return renderUserText(text, width, theme)
-	case kindAssistant, kindLiveBuffer:
+	case kindAssistant:
 		return renderMarkdownText(theme, text, width, lipgloss.NewStyle().Foreground(theme.AssistantText))
 	case kindSystem:
 		return renderLabeledMarkdownBlock(
@@ -226,6 +218,16 @@ func summarizeToolItem(item transcriptItem) string {
 	switch item.Prefix {
 	case "tool[shell]", "tool":
 		return summarizeShellTool(extractToolArgs(item.Text), item.Meta)
+	case "tool[list_dir]":
+		return summarizeListDirTool(extractToolArgs(item.Text), item.Meta)
+	case "tool[find_files]":
+		return summarizeFindFilesTool(extractToolArgs(item.Text), item.Meta)
+	case "tool[grep]":
+		return summarizeGrepTool(extractToolArgs(item.Text), item.Meta)
+	case "tool[fetch_url]":
+		return summarizeFetchURLTool(extractToolArgs(item.Text), item.Meta)
+	case "tool[read_file]":
+		return summarizeReadFileTool(extractToolArgs(item.Text), item.Meta)
 	default:
 		if strings.TrimSpace(item.Meta) == "" {
 			return "Tool activity"
@@ -233,6 +235,80 @@ func summarizeToolItem(item transcriptItem) string {
 		status := strings.TrimSpace(item.Meta)
 		return strings.ToUpper(status[:1]) + status[1:]
 	}
+}
+
+func summarizeReadFileTool(args string, status string) string {
+	type readFileArgs struct {
+		Path string `json:"path"`
+	}
+	var parsed readFileArgs
+	if err := json.Unmarshal([]byte(args), &parsed); err != nil {
+		return fallbackToolStatus(status, "Reading file")
+	}
+	target := strings.TrimSpace(parsed.Path)
+	if target == "" {
+		return fallbackToolStatus(status, "Reading file")
+	}
+	return fallbackToolStatus(status, "Reading ["+target+"]")
+}
+
+func summarizeListDirTool(args string, status string) string {
+	type listDirArgs struct {
+		Path string `json:"path"`
+	}
+	var parsed listDirArgs
+	if err := json.Unmarshal([]byte(args), &parsed); err != nil {
+		return fallbackToolStatus(status, "Listing directory")
+	}
+	target := strings.TrimSpace(parsed.Path)
+	if target == "" {
+		target = "."
+	}
+	return fallbackToolStatus(status, "Listing ["+target+"]")
+}
+
+func summarizeFindFilesTool(args string, status string) string {
+	type findFilesArgs struct {
+		Path    string `json:"path"`
+		Pattern string `json:"pattern"`
+	}
+	var parsed findFilesArgs
+	if err := json.Unmarshal([]byte(args), &parsed); err != nil {
+		return fallbackToolStatus(status, "Finding files")
+	}
+	if strings.TrimSpace(parsed.Pattern) == "" {
+		return fallbackToolStatus(status, "Finding files")
+	}
+	return fallbackToolStatus(status, "Finding ["+parsed.Pattern+"]")
+}
+
+func summarizeGrepTool(args string, status string) string {
+	type grepArgs struct {
+		Pattern string `json:"pattern"`
+	}
+	var parsed grepArgs
+	if err := json.Unmarshal([]byte(args), &parsed); err != nil {
+		return fallbackToolStatus(status, "Searching text")
+	}
+	if strings.TrimSpace(parsed.Pattern) == "" {
+		return fallbackToolStatus(status, "Searching text")
+	}
+	return fallbackToolStatus(status, "Searching ["+parsed.Pattern+"]")
+}
+
+func summarizeFetchURLTool(args string, status string) string {
+	type fetchURLArgs struct {
+		URL string `json:"url"`
+	}
+	var parsed fetchURLArgs
+	if err := json.Unmarshal([]byte(args), &parsed); err != nil {
+		return fallbackToolStatus(status, "Fetching URL")
+	}
+	target := strings.TrimSpace(parsed.URL)
+	if target == "" {
+		return fallbackToolStatus(status, "Fetching URL")
+	}
+	return fallbackToolStatus(status, "Fetching ["+truncateCommand(target, 48)+"]")
 }
 
 func summarizeShellTool(args string, status string) string {

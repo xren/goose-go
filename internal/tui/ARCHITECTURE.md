@@ -2,37 +2,33 @@
 
 ## Role
 
-`internal/tui` is the Bubble Tea frontend over the existing headless runtime.
+`internal/tui` is the Bubble Tea frontend over the headless runtime.
 
 It does not own provider logic, tool execution, or session persistence rules. It owns:
 
-- Bubble Tea application lifecycle
+- Bubble Tea lifecycle
 - TUI state reduction
-- transcript rendering
-- input handling
-- local slash-command handling for runtime metadata, in-TUI model selection, and display toggles
+- terminal-native transcript printing
+- bottom control-surface rendering
+- local slash-command handling
+- approval, model, session, and theme panels
 - runtime event consumption
-- interrupt wiring at the UI layer
 
 ## Current Stage
 
-This package now contains the full Stage 1 MVP plus the first Stage 2 interaction slices:
+This package contains the Stage 1 MVP plus most Stage 2 interaction work:
 
-- single-column layout
-- transcript viewport
+- normal-screen Bubble Tea UI
+- terminal-owned transcript scrollback
 - text input composer
-- submit/run flow
-- resume by known session id
-- live rendering from `ReplyStream(...)`
-- grouped tool blocks plus compaction and failure notices
-- debug-driven transcript verbosity, controlled entirely at the TUI layer
-- interrupt of the active run
-- registry-backed model selection through `/model`
-- built-in dark/light theme selection through `--theme` and `/theme`
-- recent-session entry through `/sessions` and `Ctrl-R`
-- transcript-first layout with session/model/cwd/status metadata rendered near the composer at the bottom
-
-Shell execution now requires approval on the TUI surface, and approval-required runs are handled inside the TUI through a focused approval panel backed by the existing approval continuation seam in `internal/agent` and `internal/app`.
+- status and metadata bars near the bottom
+- live assistant preview while a run is active
+- replay of persisted session history into terminal scrollback
+- approval UI backed by the runtime approval seam
+- model picker, session picker, and theme picker
+- local commands such as `/help`, `/session`, `/model`, `/sessions`, `/theme`, `/debug`, and `/new`
+- compact/debug transcript rendering modes
+- markdown-aware assistant/system rendering
 
 ## Frontend Structure
 
@@ -51,18 +47,18 @@ flowchart LR
 
     C --> J["Bubble Tea model"]
     J --> K["state reducer"]
-    K --> L["transcript state"]
+    K --> L["printed transcript state"]
     K --> M["panel state"]
     K --> N["composer state"]
-    K --> O["scroll state"]
+    K --> O["live preview state"]
     K --> P["theme state"]
 
     I --> J
-    J --> Q["viewport renderer"]
+    J --> Q["scrollback printer"]
     J --> R["local commands"]
     J --> S["pickers / approval panel"]
 
-    Q --> T["transcript view"]
+    Q --> T["terminal scrollback"]
     R --> U["/model /sessions /theme /debug /help /new"]
     S --> V["model picker"]
     S --> W["session picker"]
@@ -75,12 +71,11 @@ flowchart LR
     AA --> AB[".goose-go/traces/*.jsonl"]
 ```
 
-This is the concrete frontend boundary:
+Important correction:
 
-- `internal/app` composes the runtime and owns provider/session/model wiring
-- `internal/agent` owns execution and event emission
-- `internal/tui` owns state reduction, rendering, pickers, and local commands
-- traces are runtime artifacts, but the TUI is one of the consumers that drives them
+- the TUI no longer owns transcript scrolling through a `viewport.Model`
+- the terminal owns scrollback, wheel scrolling, and text selection
+- Bubble Tea owns only the live bottom control surface and modal/picker panels
 
 ## Runtime Diagram
 
@@ -90,21 +85,27 @@ flowchart LR
     B --> C["app.Runtime"]
     C --> D["session store"]
     C --> E["agent runtime"]
+
     A --> F["internal/tui model"]
-    F --> G["session replay"]
+    F --> G["session replay command"]
     G --> C
-    F --> H["runtime bridge"]
+
+    F --> H["run / approval bridge"]
     H --> E
     E --> I["agent events"]
+
     I --> J["TUI reducer"]
-    J --> K["viewport + input view"]
-    I --> L["trace writer"]
-    L --> C
+    J --> K["scrollback print commands"]
+    J --> L["live bottom surface"]
+
+    K --> M["terminal scrollback"]
+    I --> N["trace writer"]
+    N --> C
 ```
 
 ## State Model
 
-The root model keeps:
+The Bubble Tea model now keeps only live interactive state:
 
 - session metadata
   - session id
@@ -118,157 +119,108 @@ The root model keeps:
   - completed
   - failed
   - awaiting approval
-- transcript items
-  - user
-  - assistant
-  - tool
-  - system
-  - error
-  - live assistant buffer
-- Bubble Tea components
+- composer state
   - `textinput.Model`
-  - `viewport.Model`
-- concurrency handles
-  - async message channel
-  - current run cancel func
-  - current trace writer
+- panel state
+  - approval
+  - model picker
+  - session picker
+  - theme picker
+- live preview state
+  - in-progress assistant text
+- active tool state
+  - temporary grouped tool data needed to render a final tool result
+- trace writer / cancel handles
 
-## Stage 1 Command Flow
+The model does **not** own persistent transcript history anymore.
 
-The implemented command path is:
+## Event To Output Rules
 
-```mermaid
-sequenceDiagram
-    participant CLI as "cmd/goose-go tui"
-    participant APP as "internal/app.OpenRuntime"
-    participant TUI as "internal/tui"
-    participant STORE as "session store"
-    participant AGENT as "Agent.ReplyStream"
+The reducer treats runtime events as facts and maps them into either:
 
-    CLI->>APP: OpenRuntime(...)
-    APP-->>CLI: Runtime
-    CLI->>TUI: Run(runtime, options)
+- printed transcript output
+- live preview updates
+- bottom-surface state changes
 
-    alt resume
-        TUI->>STORE: GetSession(session_id)
-        STORE-->>TUI: persisted conversation
-        TUI->>TUI: build transcript items
-    end
+Current rules:
 
-    TUI->>AGENT: ReplyStream(session_id, prompt)
-    AGENT-->>TUI: user/tool/assistant/compaction events
-    TUI->>TUI: update transcript/status
-    TUI-->>CLI: redraw
-```
+- `user_message_persisted`
+  - print the persisted user message into scrollback
+- `provider_text_delta`
+  - update only the bottom live assistant preview
+- `assistant_message_complete`
+  - clear the preview and print the finalized assistant message into scrollback
+- `tool_call_detected`
+  - print a compact tool activity line into scrollback
+- `tool_message_persisted`
+  - print the finalized compact/debug tool rendering into scrollback
+- `approval_required`
+  - open the approval panel in the bottom surface
+- `run_completed`, `run_failed`, `run_interrupted`
+  - update run status and print only the transcript-visible notices
 
-## Event Flow
+## Replay And Resume
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant T as Bubble Tea Model
-    participant R as Runtime Bridge
-    participant A as Agent.ReplyStream
+On startup with `--session <id>` or after `/sessions` selection:
 
-    U->>T: submit prompt
-    T->>R: start run
-    R->>A: ReplyStream(session, prompt)
-    A-->>R: agent events
-    R-->>T: Bubble Tea messages
-    T->>T: reduce state
-    T-->>U: redraw transcript
+1. load the persisted conversation through `internal/app`
+2. rebuild transcript items from the session store
+3. render those items with the same transcript renderer used for live output
+4. print them into terminal scrollback
+5. resume interaction on the same bottom control surface
 
-    U->>T: Ctrl-C
-    T->>R: cancel active run
-    A-->>R: run_interrupted
-    R-->>T: Bubble Tea message
-    T-->>U: interrupted state
-```
+So replay and live rendering share the same rendering path.
+
+## Transcript Rules
+
+Transcript rendering is still structured, but it is now print-oriented instead of viewport-oriented.
+
+Rules:
+
+- user messages render as subdued full-width bubbles
+- assistant and system message content render through [markdown/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/markdown/ARCHITECTURE.md)
+- user and assistant text render without explicit role prefixes
+- system and error output keep explicit labels
+- tool activity uses grouped semantics but prints as subdued transcript lines instead of bordered cards
+- compact mode prints short summaries
+- debug mode prints full indented tool details
+- all transcript rendering remains width-bounded before printing, so scrollback output does not rely on raw terminal wrapping of oversized lines
 
 ## Boundaries
 
 `internal/tui` may:
 
-- load a known session through the session/runtime boundary
+- load or replay sessions through the runtime boundary
 - start runs through the runtime boundary
-- replay persisted conversation for resume
+- continue approval flows through the runtime boundary
+- print transcript output based on normalized agent events
 - write traces through the provided recorder
 
 `internal/tui` must not:
 
 - talk to provider implementations directly
 - execute tools directly
-- inspect SQLite directly for live state
+- read SQLite directly for live state
 - parse provider-specific wire events
 
-## Transcript Rules
+## Current Interaction Model
 
-The TUI keeps transcript items as structured state, not only as pre-rendered strings.
-
-Rendering rules:
-
-- user and assistant text render without explicit role prefixes; color and hierarchy distinguish them instead
-- user messages now render as subdued gray-background bubbles instead of plain foreground-only text
-- assistant and system message content now render through [markdown/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/markdown/ARCHITECTURE.md), which owns inline markdown parsing and styled wrapping while leaving transcript layout here
-- vertical breathing room between turns is now provided by transcript-item spacing rather than oversized padding inside each user bubble
-- streamed assistant deltas accumulate in a temporary live buffer
-- final assistant messages replace that live buffer to avoid duplicate output
-- each tool call is grouped into one logical transcript block keyed by tool call id
-- grouped tool items carry args, lifecycle status, and final output/error text
-- tool activity now renders as subdued width-bounded transcript lines instead of bordered cards
-- compact mode renders short summaries like `Reading [path]` without showing full args/output
-- user, assistant, system, and error transcript lines are also width-bounded and wrapped inside the viewport instead of being emitted as oversized single lines
-- compaction and failure events render as system notices
-
-Current transcript replay behavior:
-
-- persisted conversation is replayed from the session store on startup when `--session` is used
-- live events are appended after replay
-- the TUI does not read trace files to reconstruct history
-
-## Current Constraints
-
-- single-column only
-- no command palette beyond local slash commands
-- no side panels
-- no SQLite polling for live updates
-
-Current implementation detail:
-
-- `Ctrl-C` quits when idle
-- `Ctrl-C` or `Esc` interrupts the active run when running
+- normal screen mode only
+- no alt-screen
+- no app-owned transcript viewport
+- no Bubble Tea mouse capture by default
+- terminal scrollback handles:
+  - mouse wheel history
+  - text selection/copy
+  - terminal search
+- pickers stay keyboard-driven
+- `Ctrl-C` or `Esc` interrupts the active run
 - `Ctrl-D` quits only when idle
 - `Ctrl-R` opens the recent-session picker when idle
-- `PageUp` / `PageDown` scroll the transcript viewport without leaving the composer
-- the recent-session picker now uses a windowed list and consumes `PageUp` / `PageDown`, `Home`, and `End` for long session lists
-- `Home` / `End` jump to the top or bottom of transcript history
-- the transcript only auto-follows new output when the viewport is already at the bottom; if the user scrolls up, new output does not yank the viewport back down
-- `/help` lists the current local command surface
-- `/session` reports current session metadata from TUI/runtime state
-- `/new` resets the interactive surface to a fresh session state
-- `/debug` toggles debug mode for the current TUI session
-- `/theme` is handled locally in the TUI, opens a built-in theme picker, and updates only TUI presentation state
-- Bubble Tea mouse capture is enabled so transcript wheel scrolling and session-picker wheel navigation work by default
-- shell-triggered approval-required runs open a focused approval panel with allow/deny actions
-- `/model` is handled locally in the TUI, opens a registry-backed picker, and does not start a provider run
-- `/sessions` is handled locally in the TUI, opens a recent-session picker, and loads the selected session through the runtime boundary
-- the composer now has a clearer active/inactive surface treatment, and pickers now include inline confirm/cancel hints plus stronger selected-row emphasis
-- the TUI root context is now long-lived and cancelable, not capped by a fixed 5-minute deadline
-- TUI styling is now driven by semantic tokens in [theme/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/theme/ARCHITECTURE.md) instead of scattered color literals
-- the transcript now starts at the top of the screen; session/model/cwd/status metadata render in the lower control area above the footer
 
 ## Current Gaps
 
-Remaining Stage 2 work:
-
-1. richer command surfaces
-2. interaction-surface polish
-3. custom theme loading and hot reload
-
-## Next Steps
-
-The next TUI work stays in Stage 2:
-
-1. richer command surfaces
-2. interaction-surface polish
-3. custom theme loading and hot reload
+- transcript history is now terminal-owned, so there is no app-level scroll position to inspect or replay inside the reducer
+- session/model/theme pickers are keyboard-driven only
+- the command surface is useful but still small
+- custom file-backed themes are not implemented yet

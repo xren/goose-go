@@ -8,13 +8,7 @@ import (
 )
 
 func (m model) View() string {
-	header := m.headerView()
-	cwd := m.metaView()
-	status := m.statusView()
-	if m.errorText != "" {
-		status += "\n" + m.errorTextStyle().Render(m.errorText)
-	}
-	parts := []string{m.viewport.View()}
+	parts := make([]string, 0, 8)
 	if panel := m.approvalPanel(); panel != "" {
 		parts = append(parts, panel)
 	}
@@ -27,61 +21,38 @@ func (m model) View() string {
 	if panel := m.themePickerPanel(); panel != "" {
 		parts = append(parts, panel)
 	}
-	parts = append(parts, m.composerView(), status, header, cwd, m.footerStyle().Render(m.footerText()))
+	if preview := m.previewView(); preview != "" {
+		parts = append(parts, preview)
+	}
+	parts = append(parts, m.composerView())
+	parts = append(parts, m.statusView())
+	if m.errorText != "" {
+		parts = append(parts, m.errorTextStyle().Render(m.errorText))
+	}
+	parts = append(parts, m.headerView(), m.metaView(), m.footerStyle().Render(m.footerText()))
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
 func (m *model) layout() {
-	if m.width <= 0 || m.height <= 0 {
-		return
+	if m.width > 0 {
+		m.input.Width = max(12, m.width-4)
 	}
-	headerLines := 3
-	footerLines := 2
-	composerLines := 1
-	approvalLines := 0
-	if m.approval.Request != nil {
-		approvalLines = 7
-		if m.approval.Err != "" {
-			approvalLines++
-		}
-	}
-	pickerLines := 0
-	if m.picker.Open {
-		pickerLines = len(m.picker.Items) + 3
-		if m.picker.Err != "" {
-			pickerLines++
-		}
-		if pickerLines < 6 {
-			pickerLines = 6
-		}
-	}
-	sessionLines := 0
-	if m.sessions.Open {
-		_, sessionLines = m.sessionPickerMetrics()
-	}
-	themeLines := 0
-	if m.themes.Open {
-		themeLines = len(m.themes.Items) + 4
-		if themeLines < 6 {
-			themeLines = 6
-		}
-	}
-	bodyHeight := m.height - headerLines - footerLines - composerLines - approvalLines - pickerLines - sessionLines - themeLines
-	if bodyHeight < 3 {
-		bodyHeight = 3
-	}
-	m.viewport.Width = m.width
-	m.viewport.Height = bodyHeight
-	m.viewport.YPosition = 0
-	m.syncViewport(false)
 }
 
-func (m *model) syncViewport(forceBottom bool) {
-	wasAtBottom := m.viewport.AtBottom()
-	m.viewport.SetContent(renderItems(m.theme, m.items, m.viewport.Width, m.debug))
-	if forceBottom || wasAtBottom {
-		m.viewport.GotoBottom()
+func (m model) previewView() string {
+	if strings.TrimSpace(m.liveAssistant) == "" {
+		return ""
 	}
+	width := m.transcriptWidth()
+	body := renderMarkdownText(m.theme, m.liveAssistant, max(20, width-2), lipgloss.NewStyle().Foreground(m.theme.AssistantText))
+	style := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, false, false, false).
+		BorderForeground(m.theme.Border).
+		Padding(0, 1)
+	if width > 0 {
+		style = style.Width(width)
+	}
+	return style.Render(body)
 }
 
 func (m model) headerView() string {
@@ -177,53 +148,23 @@ func (m model) sessionPickerMetrics() (visibleItems int, panelLines int) {
 	if !m.sessions.Open {
 		return 0, 0
 	}
-
 	if m.height <= 0 {
 		visibleItems = min(max(1, len(m.sessions.Items)), 8)
 	} else {
-		const (
-			headerLines   = 3
-			footerLines   = 2
-			composerLines = 1
-			minBodyHeight = 8
-			minPanelLines = 6
-		)
-
-		approvalLines := 0
+		controlLines := 5
+		panelReserve := 0
 		if m.approval.Request != nil {
-			approvalLines = 7
+			panelReserve += 7
 			if m.approval.Err != "" {
-				approvalLines++
+				panelReserve++
 			}
 		}
-
-		pickerLines := 0
-		if m.picker.Open {
-			pickerLines = len(m.picker.Items) + 3
-			if m.picker.Err != "" {
-				pickerLines++
-			}
-			if pickerLines < minPanelLines {
-				pickerLines = minPanelLines
-			}
+		maxPanelLines := m.height - controlLines - panelReserve
+		if maxPanelLines < 6 {
+			maxPanelLines = 6
 		}
-
-		themeLines := 0
-		if m.themes.Open {
-			themeLines = len(m.themes.Items) + 4
-			if themeLines < minPanelLines {
-				themeLines = minPanelLines
-			}
-		}
-
-		maxPanelLines := m.height - headerLines - footerLines - composerLines - approvalLines - pickerLines - themeLines - minBodyHeight
-		if maxPanelLines < minPanelLines {
-			maxPanelLines = minPanelLines
-		}
-
 		visibleItems = max(1, (maxPanelLines-3)/2)
 	}
-
 	visibleItems = min(visibleItems, max(1, len(m.sessions.Items)))
 	panelLines = max(6, visibleItems*2+3)
 	if m.sessions.Err != "" {

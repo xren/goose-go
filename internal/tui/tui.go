@@ -10,7 +10,6 @@ import (
 	tuitheme "goose-go/internal/tui/theme"
 
 	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"goose-go/internal/agent"
@@ -41,12 +40,11 @@ type Options struct {
 type itemKind string
 
 const (
-	kindUser       itemKind = "user"
-	kindAssistant  itemKind = "assistant"
-	kindTool       itemKind = "tool"
-	kindSystem     itemKind = "system"
-	kindError      itemKind = "error"
-	kindLiveBuffer itemKind = "live_buffer"
+	kindUser      itemKind = "user"
+	kindAssistant itemKind = "assistant"
+	kindTool      itemKind = "tool"
+	kindSystem    itemKind = "system"
+	kindError     itemKind = "error"
 )
 
 type transcriptItem struct {
@@ -86,59 +84,29 @@ type themePickerState struct {
 }
 
 type model struct {
-	ctx        context.Context
-	runtime    Runtime
-	opts       Options
-	input      textinput.Model
-	viewport   viewport.Model
-	width      int
-	height     int
-	status     string
-	errorText  string
-	sessionID  string
-	workingDir string
-	items      []transcriptItem
-	async      chan tea.Msg
-	running    bool
-	cancelRun  context.CancelFunc
-	trace      app.EventRecorder
-	approval   approvalViewState
-	picker     modelPickerState
-	sessions   sessionPickerState
-	themes     themePickerState
-	theme      tuitheme.Palette
-	debug      bool
-}
-
-func (m model) canScrollTranscript() bool {
-	return !m.sessions.Open && !m.picker.Open && !m.themes.Open && m.approval.Request == nil
-}
-
-func (m *model) handleViewportKey(msg tea.KeyMsg) bool {
-	if !m.canScrollTranscript() {
-		return false
-	}
-	switch msg.String() {
-	case "up", "ctrl+p":
-		m.viewport.ScrollUp(1)
-		return true
-	case "down", "ctrl+n":
-		m.viewport.ScrollDown(1)
-		return true
-	case "pgup", "ctrl+u", "ctrl+b":
-		m.viewport.HalfPageUp()
-		return true
-	case "pgdown", "ctrl+f":
-		m.viewport.HalfPageDown()
-		return true
-	case "home":
-		m.viewport.GotoTop()
-		return true
-	case "end":
-		m.viewport.GotoBottom()
-		return true
-	}
-	return false
+	ctx           context.Context
+	runtime       Runtime
+	opts          Options
+	input         textinput.Model
+	width         int
+	height        int
+	status        string
+	errorText     string
+	sessionID     string
+	workingDir    string
+	async         chan tea.Msg
+	running       bool
+	cancelRun     context.CancelFunc
+	trace         app.EventRecorder
+	approval      approvalViewState
+	picker        modelPickerState
+	sessions      sessionPickerState
+	themes        themePickerState
+	theme         tuitheme.Palette
+	debug         bool
+	liveAssistant string
+	activeTools   []transcriptItem
+	printer       transcriptPrinter
 }
 
 type modelsLoadedMsg struct{ items []models.Availability }
@@ -150,7 +118,7 @@ type sessionsLoadFailedMsg struct{ err error }
 
 func Run(ctx context.Context, in io.Reader, out io.Writer, runtime Runtime, opts Options) error {
 	m := newModel(ctx, runtime, opts)
-	p := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(out), tea.WithAltScreen(), tea.WithMouseCellMotion())
+	p := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(out))
 	_, err := p.Run()
 	return err
 }
@@ -166,25 +134,29 @@ func newModel(ctx context.Context, runtime Runtime, opts Options) model {
 	input.Prompt = "> "
 	input.CharLimit = 0
 
-	vp := viewport.New(0, 0)
-	vp.SetContent("")
-
 	return model{
 		ctx:        ctx,
 		runtime:    runtime,
 		opts:       opts,
 		input:      input,
-		viewport:   vp,
-		status:     "idle",
+		status:     initialStatus(opts),
 		workingDir: runtime.WorkingDir(),
 		async:      make(chan tea.Msg, 128),
 		theme:      palette,
 		debug:      opts.Debug,
+		printer:    bubbleTranscriptPrinter{},
 	}
 }
 
+func initialStatus(opts Options) string {
+	if opts.SessionID != "" {
+		return "loading session"
+	}
+	return "idle"
+}
+
 func (m model) Init() tea.Cmd {
-	cmds := []tea.Cmd{waitForAsync(m.async)}
+	cmds := []tea.Cmd{waitForAsync(m.async), tea.WindowSize()}
 	if m.opts.SessionID != "" {
 		cmds = append(cmds, loadSessionCmd(m.ctx, m.runtime, m.opts.SessionID))
 	}
@@ -197,30 +169,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.layout()
-		return m, nil
-	case tea.MouseMsg:
-		if m.sessions.Open {
-			if msg.Action != tea.MouseActionPress {
-				return m, nil
-			}
-			switch msg.Button {
-			case tea.MouseButtonWheelUp:
-				if m.sessions.Selected > 0 {
-					m.sessions.Selected--
-				}
-				return m, nil
-			case tea.MouseButtonWheelDown:
-				if m.sessions.Selected < len(m.sessions.Items)-1 {
-					m.sessions.Selected++
-				}
-				return m, nil
-			}
-		}
-		if m.canScrollTranscript() {
-			var cmd tea.Cmd
-			m.viewport, cmd = m.viewport.Update(msg)
-			return m, cmd
-		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.sessions.Open {
@@ -333,13 +281,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.theme = palette
 				m.themes = themePickerState{}
 				m.status = "idle"
-				m.items = append(m.items,
-					transcriptItem{Kind: kindSystem, Prefix: "system", Text: "/theme"},
-					transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("selected theme: %s", palette.Name)},
-				)
-				m.layout()
-				m.syncViewport(true)
-				return m, nil
+				return m, m.printItemsCmd([]transcriptItem{
+					{Kind: kindSystem, Prefix: "system", Text: "/theme"},
+					{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("selected theme: %s", palette.Name)},
+				})
 			}
 		}
 
@@ -371,10 +316,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-		case "up", "down", "pgup", "pgdown", "home", "end", "ctrl+u", "ctrl+b", "ctrl+f", "ctrl+p", "ctrl+n":
-			if m.handleViewportKey(msg) {
-				return m, nil
-			}
 		case "ctrl+r":
 			if m.running || m.approval.Request != nil || m.picker.Open {
 				return m, nil
@@ -395,7 +336,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "enter":
-			if m.running || m.approval.Request != nil || m.picker.Open || m.themes.Open {
+			if m.running || m.approval.Request != nil || m.picker.Open || m.themes.Open || m.sessions.Open {
 				return m, nil
 			}
 			prompt := strings.TrimSpace(m.input.Value())
@@ -411,16 +352,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errorText = ""
 				return m, loadModelsCmd(m.ctx, m.runtime)
 			}
-			if m.handleLocalCommand(prompt) {
-				m.syncViewport(true)
-				return m, nil
+			if handled, cmd := m.handleLocalCommand(prompt); handled {
+				return m, cmd
 			}
 			m.status = "starting"
 			return m, startRunCmd(m.ctx, m.runtime, m.async, prompt, m.sessionID)
 		case "ctrl+d":
-			if m.handleViewportKey(msg) {
-				return m, nil
-			}
 			if !m.running {
 				return m, tea.Quit
 			}
@@ -457,15 +394,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case modelSetMsg:
 		providerName, modelName := m.runtime.ProviderModel()
-		m.items = append(m.items,
-			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "/model"},
-			transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("selected provider: %s\nselected model: %s", providerName, modelName)},
-		)
 		m.picker = modelPickerState{}
 		m.status = "idle"
-		m.layout()
-		m.syncViewport(true)
-		return m, nil
+		return m, m.printItemsCmd([]transcriptItem{
+			{Kind: kindSystem, Prefix: "system", Text: "/model"},
+			{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("selected provider: %s\nselected model: %s", providerName, modelName)},
+		})
 	case modelSetFailedMsg:
 		m.picker.Busy = false
 		m.picker.Err = msg.err.Error()
@@ -475,7 +409,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessions = sessionPickerState{}
 		m.sessionID = msg.session.ID
 		m.workingDir = msg.session.WorkingDir
-		m.items = buildTranscriptFromConversation(msg.session.Conversation)
+		m.liveAssistant = ""
+		m.activeTools = nil
 		m.approval.Request = msg.approval
 		m.approval.Busy = false
 		m.approval.Err = ""
@@ -484,14 +419,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status = "idle"
 		}
-		m.layout()
-		m.syncViewport(true)
-		return m, nil
+		return m, m.printConversationCmd(msg.session.Conversation)
 	case sessionLoadFailedMsg:
 		m.sessions = sessionPickerState{}
 		m.status = "failed"
 		m.errorText = msg.err.Error()
-		m.layout()
 		return m, nil
 	case runStartedMsg:
 		m.sessionID = msg.session.ID
@@ -501,8 +433,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.running = true
 		m.status = "running"
 		m.approval = approvalViewState{}
-		m.layout()
-		m.syncViewport(true)
+		m.liveAssistant = ""
+		m.activeTools = nil
 		return m, nil
 	case runStartFailedMsg:
 		m.status = "failed"
@@ -514,8 +446,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.running = true
 		m.status = "running"
 		m.errorText = ""
-		m.layout()
-		m.syncViewport(true)
+		m.liveAssistant = ""
 		return m, nil
 	case approvalStartFailedMsg:
 		m.running = false
@@ -525,8 +456,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.approval.Err = msg.err.Error()
 		return m, nil
 	case agentEventMsg:
-		m.applyAgentEvent(msg.event)
-		return m, waitForAsync(m.async)
+		cmd := m.applyAgentEvent(msg.event)
+		return m, waitWith(cmd, m.async)
 	case traceWriteFailedMsg:
 		m.status = "failed"
 		m.errorText = msg.err.Error()

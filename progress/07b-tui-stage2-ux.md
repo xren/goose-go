@@ -165,7 +165,7 @@ Implemented:
 - `/sessions` now opens a recent-session picker inside the TUI
 - `Ctrl-R` opens the same picker as a keyboard shortcut
 - selecting a session replays persisted conversation and adopts its persisted provider/model through the runtime boundary
-- the session picker now uses a scrollable window for long lists, with wheel and page-key navigation
+- the session picker now uses a keyboard-driven windowed list for long histories
 
 Acceptance:
 - users no longer need to copy session ids to resume work in the TUI
@@ -208,6 +208,7 @@ Current note:
 - approval, model selection, recent-session picking, grouped tool blocks, and the first local command set are now in place
 - shared panel styling, transcript hierarchy, and built-in tokenized dark/light themes are now in place
 - assistant and system transcript text now use a dedicated inline markdown renderer backed by `goldmark`, while transcript layout remains owned by `internal/tui`
+- transcript history is now terminal-owned scrollback rather than a Bubble Tea viewport; the TUI only owns the bottom live surface and modal panels
 - remaining Stage 2 work is about interaction-surface polish, richer command surfaces, and eventual custom themes
 
 ### Phase 6: Styling and layout standardization
@@ -277,7 +278,6 @@ Do not:
 - couple picker logic to current database schema details
 
 ## Tool Rendering Notes
-
 Keep grouped tool state reducer-driven. Do not reparse rendered strings, and do not fall back to flat transcript lines for replayed sessions.
 
 ## Testing Strategy

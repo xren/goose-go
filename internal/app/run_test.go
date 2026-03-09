@@ -455,3 +455,44 @@ func TestRunAgentResumeUsesPersistedProviderModel(t *testing.T) {
 		t.Fatalf("expected resumed run to use persisted model, got %q", second.String())
 	}
 }
+
+func TestRunAgentIncludesAGENTSInSystemPrompt(t *testing.T) {
+	originalProviderFactory := newRunProvider
+	originalStoreOpener := openRunStore
+	t.Cleanup(func() {
+		newRunProvider = originalProviderFactory
+		openRunStore = originalStoreOpener
+	})
+
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+	subdir := filepath.Join(root, "subdir")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatalf("mkdir subdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("Always mention the repo root."), 0o644); err != nil {
+		t.Fatalf("write AGENTS: %v", err)
+	}
+
+	newRunProvider = func(_ io.Writer) (provider.Provider, error) {
+		return scriptedAppProvider{
+			respond: func(req provider.Request) []provider.Event {
+				if !strings.Contains(req.SystemPrompt, "Always mention the repo root.") {
+					t.Fatalf("expected system prompt to include AGENTS contents, got %q", req.SystemPrompt)
+				}
+				msg := conversation.NewMessage(conversation.RoleAssistant, conversation.Text("ok"))
+				return []provider.Event{{Type: provider.EventTypeMessageComplete, Message: &msg}, {Type: provider.EventTypeDone}}
+			},
+		}, nil
+	}
+
+	var out bytes.Buffer
+	if err := RunAgent(context.Background(), strings.NewReader(""), &out, "hello", RunOptions{
+		WorkingDir: subdir,
+		DBPath:     filepath.Join(t.TempDir(), "sessions.db"),
+	}); err != nil {
+		t.Fatalf("run agent: %v", err)
+	}
+}
