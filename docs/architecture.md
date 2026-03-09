@@ -12,8 +12,18 @@ These packages define the intended shape of the system. They are architectural t
 
 - `cmd/goose-go`
   CLI entrypoint only.
+- `cmd/archcheck`
+  Thin CLI wrapper for mechanical architecture-boundary checks.
+- `cmd/repocheck`
+  Thin CLI wrapper for repo hygiene checks.
+- `internal/app`
+  Runtime composition, CLI-facing flows, diagnostics, trace writing, and shared startup/runtime selection.
 - `internal/agent`
   Turn loop, orchestration, retries, approval flow, compaction hooks.
+- `internal/compaction`
+  Token budgeting, cut-point planning, summary generation, and active-context reconstruction.
+- `internal/models`
+  Built-in provider/model catalog, availability filtering, and runtime selection helpers.
 - `internal/conversation`
   Message types, tool call/result types, conversation state, serialization.
 - `internal/provider`
@@ -26,6 +36,10 @@ These packages define the intended shape of the system. They are architectural t
   Session types, store contracts, resume/replay semantics, token/accounting metadata.
 - `internal/storage`
   Persistence implementations such as SQLite, including schema and migrations.
+- `internal/archcheck`
+  Reusable architecture-check rules and package-boundary validation.
+- `internal/repocheck`
+  Repo hygiene checks such as oversized-file and Markdown-link validation.
 - `internal/prompt`
   System prompt builder, local hint loading, prompt composition.
 - `internal/config`
@@ -39,11 +53,14 @@ These packages define the intended shape of the system. They are architectural t
 
 ## Layer Boundaries
 
+- `app` composes runtime pieces. It should not absorb provider internals, tool execution internals, or UI state logic.
 - `agent` orchestrates. It should not embed provider-specific HTTP logic or low-level persistence details.
+- `compaction` plans and summarizes context. It should not own session persistence or UI behavior.
+- `models` defines selectable runtime identity. It should not know about TUI widgets or provider HTTP details.
 - `provider` talks to models. It should not execute tools or manage sessions.
 - `tools` executes tool logic. It should not know about provider request formats.
 - `session` persists state. It should not own agent orchestration rules.
-- `cli` renders and collects terminal interaction. It should not contain core agent logic.
+- `tui` renders and collects terminal interaction. It should not contain core agent logic.
 
 These boundaries are now partially enforced by [internal/archcheck/check.go](/Users/rex/projects/goose-go/internal/archcheck/check.go) and [internal/archcheck/rules.go](/Users/rex/projects/goose-go/internal/archcheck/rules.go), with [cmd/archcheck/main.go](/Users/rex/projects/goose-go/cmd/archcheck/main.go) acting as a thin CLI wrapper:
 
@@ -59,39 +76,51 @@ These boundaries are now partially enforced by [internal/archcheck/check.go](/Us
 ```mermaid
 flowchart LR
     A["cmd/goose-go"] --> B["internal/app"]
-    B --> C["internal/agent"]
-    B --> D["session.Store"]
     A --> T["internal/tui"]
+    A --> AC["cmd/archcheck"]
+    A --> RC["cmd/repocheck"]
     T --> B
 
-    C --> E["internal/provider"]
-    C --> F["internal/tools"]
-    C --> D
-    C --> G["internal/conversation"]
+    B --> M["internal/models"]
+    B --> S["internal/session"]
+    B --> ST["internal/storage/sqlite"]
+    B --> C["internal/agent"]
+    B --> TR[(".goose-go/traces/<session-id>.jsonl")]
 
-    E --> H["internal/provider/openaicodex"]
-    H --> I["internal/auth/codex"]
-    I --> J["~/.codex/auth.json"]
+    C --> CV["internal/conversation"]
+    C --> P["internal/provider"]
+    C --> TO["internal/tools"]
+    C --> CP["internal/compaction"]
+    C --> S
 
-    F --> K["internal/tools/shell"]
-    D --> L["internal/storage/sqlite"]
-    L --> M[(".goose-go/sessions.db")]
+    P --> OPC["internal/provider/openaicodex"]
+    OPC --> AU["internal/auth/codex"]
+    AU --> AF["~/.codex/auth.json"]
 
-    C --> N["agent event stream"]
-    N --> O["interactive TUI"]
+    TO --> SH["internal/tools/shell"]
+    ST --> DB[(".goose-go/sessions.db")]
+
+    C --> EV["agent event stream"]
+    EV --> B
+    EV --> T
+    T --> TH["internal/tui/theme"]
+    AC --> ACH["internal/archcheck"]
+    RC --> RCH["internal/repocheck"]
 ```
 
 This reflects the current system shape:
 
-- `cmd/goose-go` and `internal/app` own process-level CLI behavior.
+- `cmd/goose-go` owns the user-facing entry surfaces, while `internal/app` owns shared runtime composition.
+- `internal/models` is now the source of truth for provider/model selection and availability filtering.
 - `internal/agent` is the runtime control plane.
 - `session.Store` is the persistence seam used by both app and agent.
+- `internal/compaction` is a real runtime subsystem behind the agent loop, not just future scaffolding.
 - provider, tools, auth, and storage stay behind their package boundaries.
-- `internal/agent` now owns a live event stream that both CLI and future TUI layers can consume.
+- `internal/agent` owns the live event stream that both `run` and `tui` consume today.
 - `cmd/goose-go run` now renders from that stream through `internal/app`, rather than waiting for a completed transcript.
 - `cmd/goose-go tui` now uses the same `internal/app.OpenRuntime` path and consumes `ReplyStream(...)` through `internal/tui`.
-- `internal/app` now also records that stream into per-session trace artifacts for later debugging and eval work.
-- `internal/app` now also owns the normalized user-facing diagnostic model for provider/auth failures across both `run` and `provider-smoke`.
+- `internal/app` records that stream into per-session trace artifacts and owns the normalized diagnostic model for provider/auth failures.
+- `internal/tui/theme` is now a concrete subsystem used by the Bubble Tea frontend, not just a styling detail.
 
 ## Current Entry Surfaces
 
@@ -99,20 +128,25 @@ This reflects the current system shape:
 flowchart TD
     A["cmd/goose-go run"] --> B["internal/app.RunAgent"]
     C["cmd/goose-go sessions"] --> D["internal/app.ListSessions"]
-    E["cmd/goose-go tui"] --> F["internal/app.OpenRuntime"]
-    F --> G["internal/tui.Run"]
+    E["cmd/goose-go models"] --> F["internal/app.ListModels"]
+    G["cmd/goose-go provider-smoke"] --> H["internal/app.ProviderSmoke"]
+    I["cmd/goose-go tui"] --> J["internal/app.OpenRuntime"]
+    J --> K["internal/tui.Run"]
 
-    B --> H["agent event stream"]
-    G --> H
-    H --> I["terminal renderer"]
-    H --> J["Bubble Tea reducer"]
+    B --> L["agent event stream"]
+    K --> L
+    L --> M["line-oriented CLI renderer"]
+    L --> N["Bubble Tea reducer"]
+    L --> O["JSONL trace writer"]
 ```
 
 This is the current concrete shape:
 
 - `run` is the line-oriented CLI over the event stream
+- `models` is the registry-backed listing surface for selectable runtime identity
+- `provider-smoke` is the narrow provider-diagnostics surface over the same model/provider configuration path
 - `tui` is the Bubble Tea frontend over the same runtime and event stream
-- both paths reuse the same provider, tool, session, trace, and compaction behavior
+- both `run` and `tui` reuse the same provider, tool, session, trace, approval, and compaction behavior
 
 ## Concrete Subsystem Docs
 

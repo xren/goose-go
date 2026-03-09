@@ -87,6 +87,7 @@ The key structural rule is:
 - assistant text should stay the primary reading surface
 - tool blocks should look like operational cards, not plain transcript lines
 - compaction and system notices should be visibly secondary
+- all transcript roles should wrap inside the viewport width rather than relying on the terminal to wrap oversized lines
 
 ### Tool Blocks
 

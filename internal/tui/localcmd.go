@@ -15,17 +15,33 @@ func (m *model) handleLocalCommand(prompt string) bool {
 		m.status = "idle"
 		m.items = append(m.items,
 			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "/help"},
-			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "commands:\n/model\n/theme\n/sessions\n/session\n/new\n/help"},
+			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "commands:\n/model\n/theme\n/sessions\n/session\n/debug\n/new\n/help"},
 		)
 		return true
 	case "/session":
 		providerName, modelName := m.runtime.ProviderModel()
 		sessionID := fallback(m.sessionID, "new")
 		cwd := fallback(m.workingDir, "-")
+		debugMode := "off"
+		if m.debug {
+			debugMode = "on"
+		}
 		m.status = "idle"
 		m.items = append(m.items,
 			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "/session"},
-			transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("session: %s\ncwd: %s\nprovider: %s\nmodel: %s\ntheme: %s", sessionID, cwd, providerName, modelName, m.theme.Name)},
+			transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("session: %s\ncwd: %s\nprovider: %s\nmodel: %s\ntheme: %s\ndebug: %s", sessionID, cwd, providerName, modelName, m.theme.Name, debugMode)},
+		)
+		return true
+	case "/debug":
+		m.debug = !m.debug
+		m.status = "idle"
+		mode := "off"
+		if m.debug {
+			mode = "on"
+		}
+		m.items = append(m.items,
+			transcriptItem{Kind: kindSystem, Prefix: "system", Text: "/debug"},
+			transcriptItem{Kind: kindSystem, Prefix: "system", Text: fmt.Sprintf("debug mode: %s", mode)},
 		)
 		return true
 	case "/new":

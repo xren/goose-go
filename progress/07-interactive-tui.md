@@ -47,6 +47,7 @@ Current note:
 - the TUI recent-session picker is now implemented on top of `ListSessions(...)` through `/sessions` and `Ctrl-R`
 - tool lifecycle is now rendered as grouped transcript blocks in the TUI instead of flat request/result lines
 - grouped tool blocks are now width-capped and wrapped inside the viewport so long outputs do not mangle the transcript layout
+- the TUI now defaults to compact rendering, with `--debug` and `/debug` available when full tool args/output and verbose UI detail are needed
 - the first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`
 - built-in dark/light theme selection is now available through `--theme` and the TUI-local `/theme` picker
 - the transcript viewport now supports mouse-wheel scrolling plus explicit history navigation through `PageUp` / `PageDown` and `Home` / `End`, and it no longer auto-snaps to bottom while the user is reading older output

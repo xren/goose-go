@@ -127,7 +127,7 @@ func (m model) footerText() string {
 	if m.approval.Request != nil {
 		return "a/y approve  d/n deny  esc/ctrl+c interrupt"
 	}
-	return "wheel/pgup/pgdown scroll  home/end jump  enter submit  ctrl+r sessions  /help commands  /theme themes  esc/ctrl+c interrupt  ctrl+d quit"
+	return "wheel/pgup/pgdown scroll  home/end jump  enter submit  ctrl+r sessions  /debug toggle  /help commands  esc/ctrl+c interrupt  ctrl+d quit"
 }
 
 func (m model) panelStyle(border lipgloss.Color) lipgloss.Style {

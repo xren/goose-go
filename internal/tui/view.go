@@ -83,7 +83,7 @@ func (m *model) layout() {
 
 func (m *model) syncViewport(forceBottom bool) {
 	wasAtBottom := m.viewport.AtBottom()
-	m.viewport.SetContent(renderItems(m.theme, m.items, m.viewport.Width))
+	m.viewport.SetContent(renderItems(m.theme, m.items, m.viewport.Width, m.debug))
 	if forceBottom || wasAtBottom {
 		m.viewport.GotoBottom()
 	}

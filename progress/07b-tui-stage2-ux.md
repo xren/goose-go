@@ -28,6 +28,7 @@ in_progress
 - approval interaction flow in the TUI
 - session picker / recent-session entry UX
 - richer grouped tool rendering
+- toggleable compact tool rendering for lower-noise long sessions
 - better status and footer surfaces
 - slash commands or a command palette for session actions
 - compaction visibility beyond simple transcript notices

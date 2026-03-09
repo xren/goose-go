@@ -132,10 +132,104 @@ func TestRenderToolItemDoesNotExceedViewportWidth(t *testing.T) {
 		),
 	}
 
-	rendered := renderToolItem(theme, item, 80)
+	rendered := renderToolItem(theme, item, 80, true)
 	for _, line := range strings.Split(rendered, "\n") {
 		if lipgloss.Width(line) > 80 {
 			t.Fatalf("expected rendered line width <= 80, got %d for line %q", lipgloss.Width(line), line)
 		}
+	}
+	if strings.ContainsAny(rendered, "╭╮╰╯│─") {
+		t.Fatalf("expected simplified tool rendering without border characters, got %q", rendered)
+	}
+}
+
+func TestRenderToolItemCompactModeHidesDetailedOutput(t *testing.T) {
+	theme, err := tuitheme.Resolve("dark")
+	if err != nil {
+		t.Fatalf("resolve theme: %v", err)
+	}
+	item := transcriptItem{
+		Kind:   kindTool,
+		Prefix: "tool[shell]",
+		Meta:   "completed",
+		Text: renderToolGroup(
+			"completed",
+			`{"command":"sed -n '1,50p' docs/invariants.md","working_dir":"."}`,
+			"# Invariants\n\nThese rules are non-negotiable.",
+			false,
+		),
+	}
+
+	rendered := renderToolItem(theme, item, 80, false)
+	if strings.Contains(rendered, "output:") {
+		t.Fatalf("expected compact rendering to hide output label, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "Reading [docs/invariants.md]") {
+		t.Fatalf("expected compact rendering summary, got %q", rendered)
+	}
+}
+
+func TestRenderToolItemDebugModeShowsIndentedDetails(t *testing.T) {
+	theme, err := tuitheme.Resolve("dark")
+	if err != nil {
+		t.Fatalf("resolve theme: %v", err)
+	}
+	item := transcriptItem{
+		Kind:   kindTool,
+		Prefix: "tool[shell]",
+		Meta:   "completed",
+		Text: renderToolGroup(
+			"completed",
+			`{"command":"pwd","working_dir":"."}`,
+			"/Users/rex/projects/goose-go",
+			false,
+		),
+	}
+
+	rendered := renderToolItem(theme, item, 80, true)
+	if !strings.Contains(rendered, "tool[shell] • completed") {
+		t.Fatalf("expected debug headline, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "  status: completed") {
+		t.Fatalf("expected indented details, got %q", rendered)
+	}
+	if strings.ContainsAny(rendered, "╭╮╰╯│─") {
+		t.Fatalf("expected simplified debug rendering without border characters, got %q", rendered)
+	}
+}
+
+func TestRenderAssistantItemDoesNotExceedViewportWidth(t *testing.T) {
+	theme, err := tuitheme.Resolve("dark")
+	if err != nil {
+		t.Fatalf("resolve theme: %v", err)
+	}
+	item := transcriptItem{
+		Kind:   kindAssistant,
+		Prefix: "assistant",
+		Text:   "Here is a long response that should wrap inside the transcript viewport instead of overflowing past the terminal width and forcing the viewport to render a single oversized line.",
+	}
+
+	rendered := renderItem(theme, item, 80, false)
+	for _, line := range strings.Split(rendered, "\n") {
+		if lipgloss.Width(line) > 80 {
+			t.Fatalf("expected rendered line width <= 80, got %d for line %q", lipgloss.Width(line), line)
+		}
+	}
+}
+
+func TestRenderUserAndAssistantItemsDoNotShowRolePrefixes(t *testing.T) {
+	theme, err := tuitheme.Resolve("dark")
+	if err != nil {
+		t.Fatalf("resolve theme: %v", err)
+	}
+
+	userRendered := renderItem(theme, transcriptItem{Kind: kindUser, Text: "hello"}, 80, false)
+	if strings.Contains(userRendered, "user>") {
+		t.Fatalf("expected user rendering without prefix, got %q", userRendered)
+	}
+
+	assistantRendered := renderItem(theme, transcriptItem{Kind: kindAssistant, Text: "world"}, 80, false)
+	if strings.Contains(assistantRendered, "assistant>") {
+		t.Fatalf("expected assistant rendering without prefix, got %q", assistantRendered)
 	}
 }

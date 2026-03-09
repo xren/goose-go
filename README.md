@@ -216,22 +216,19 @@ Verify:
 /sessions
 ```
 Or press `Ctrl-R`.
-- a recent-session picker opens inside the TUI
-- selecting a session replays its transcript
-- the resumed session adopts its persisted provider/model through the shared runtime path
+- a recent-session picker opens inside the TUI, selecting a session replays its transcript, and the resumed session adopts its persisted provider/model through the shared runtime path
 10. Exercise the local command surface in the TUI:
 ```text
 /help
 /theme
 /session
+/debug
 /new
 ```
-- Verify `/help` lists commands, `/theme` opens the built-in theme picker, `/session` reports metadata, and `/new` resets the interactive state.
+- Verify `/help` lists commands, `/theme` opens the built-in theme picker, `/session` reports metadata, `/debug` toggles debug mode, and `/new` resets the interactive state.
 11. Exercise transcript history scrolling in the TUI:
-- use the mouse wheel or trackpad to scroll through older transcript content
-- press `PageUp` / `PageDown` to scroll through older transcript content
-- press `Home` / `End` to jump to the top or bottom
-- verify that while scrolled up, new assistant or tool output does not force the viewport back to the bottom
+- use the mouse wheel or trackpad, `PageUp` / `PageDown`, and `Home` / `End`; while scrolled up, verify new assistant or tool output does not force the viewport back to the bottom
+12. Start the TUI with debug mode immediately: `go run ./cmd/goose-go tui --debug`
 ## How A Run Works
 
 At a high level, one CLI run now follows this path:

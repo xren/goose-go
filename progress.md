@@ -38,8 +38,10 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - The TUI recent-session picker is now implemented on top of `ListSessions(...)`, exposed through `/sessions` and `Ctrl-R`.
 - The TUI transcript now supports mouse-wheel scrolling plus explicit history navigation with `PageUp`/`PageDown` and `Home`/`End`, and it no longer auto-snaps to bottom while the user is reading older output.
 - Tool lifecycle is now rendered as grouped transcript blocks in the TUI instead of flat request/result lines.
+- The TUI now defaults to compact rendering, with `--debug` and `/debug` available when full tool args/output and verbose UI detail are needed.
 - The first broader local TUI command surface is now in place through `/help`, `/session`, and `/new`.
 - Built-in dark/light TUI themes are now implemented through `internal/tui/theme`, exposed via `goose-go tui --theme <name>` and the local `/theme` picker.
+- The root architecture diagram in [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md) is now synced to the current runtime shape, including `internal/app`, `internal/models`, `internal/compaction`, trace writing, and the live TUI/event-stream path.
 - The default runtime max-turn limit is now 10000 instead of 8, so long CLI and TUI sessions do not stop early under normal use.
 - `goose-go run /model` remains a local reporter, while `goose-go tui /model` now opens the registry-backed picker.
 - The next Stage 2 TUI work is now split more explicitly: interaction features are landing already, and the next planning slice adds a `pi-mono`-informed styling/layout pass plus a token-based theme system.

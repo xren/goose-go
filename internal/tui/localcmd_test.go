@@ -71,3 +71,18 @@ func TestThemeCommandOpensThemePicker(t *testing.T) {
 		t.Fatal("expected built-in themes to be available")
 	}
 }
+
+func TestDebugCommandTogglesMode(t *testing.T) {
+	m := newModel(context.Background(), &fakeRuntime{}, Options{})
+	m.input.SetValue("/debug")
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+
+	if !m.debug {
+		t.Fatal("expected debug mode to be enabled")
+	}
+	if !containsText(m.items, "system", "debug mode: on") {
+		t.Fatalf("expected debug confirmation, got %#v", m.items)
+	}
+}

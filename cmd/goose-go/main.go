@@ -93,6 +93,7 @@ func run(args []string) error {
 		providerName := fs.String("provider", "", "provider id")
 		modelName := fs.String("model", "", "model id")
 		themeName := fs.String("theme", "", "tui theme name")
+		debug := fs.Bool("debug", false, "enable verbose TUI rendering, including full tool args and output")
 		sessionID := fs.String("session", "", "resume an existing session by id")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
@@ -111,6 +112,7 @@ func run(args []string) error {
 		return tui.Run(ctx, os.Stdin, os.Stdout, runtime, tui.Options{
 			SessionID: *sessionID,
 			Theme:     *themeName,
+			Debug:     *debug,
 		})
 	default:
 		return fmt.Errorf("unknown command %q", args[0])

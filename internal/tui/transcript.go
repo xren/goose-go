@@ -61,34 +61,39 @@ func appendMessageItems(items *[]transcriptItem, message conversation.Message) {
 	}
 }
 
-func renderItems(theme tuitheme.Palette, items []transcriptItem, width int) string {
+func renderItems(theme tuitheme.Palette, items []transcriptItem, width int, showToolDetails bool) string {
 	lines := make([]string, 0, len(items))
 	for _, item := range items {
-		lines = append(lines, renderItem(theme, item, width))
+		lines = append(lines, renderItem(theme, item, width, showToolDetails))
 	}
 	return strings.Join(lines, "\n")
 }
 
-func renderItem(theme tuitheme.Palette, item transcriptItem, width int) string {
+func renderItem(theme tuitheme.Palette, item transcriptItem, width int, showToolDetails bool) string {
 	text := strings.TrimRight(item.Text, "\n")
 	switch item.Kind {
 	case kindUser:
-		style := lipgloss.NewStyle().Background(theme.UserBG).Foreground(theme.UserText).Padding(0, 1)
-		return style.Render("user> " + text)
+		return renderWrappedText(text, width, lipgloss.NewStyle().Foreground(theme.UserText))
 	case kindAssistant, kindLiveBuffer:
-		label := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).Render("assistant>")
-		body := lipgloss.NewStyle().Foreground(theme.AssistantText).Render(" " + text)
-		return label + body
+		return renderWrappedText(text, width, lipgloss.NewStyle().Foreground(theme.SystemText))
 	case kindSystem:
-		label := lipgloss.NewStyle().Foreground(theme.NoticeText).Bold(true).Render("system>")
-		body := lipgloss.NewStyle().Foreground(theme.SystemText).Render(" " + text)
-		return label + body
+		return renderLabeledBlock(
+			"system>",
+			text,
+			width,
+			lipgloss.NewStyle().Foreground(theme.NoticeText).Bold(true),
+			lipgloss.NewStyle().Foreground(theme.SystemText),
+		)
 	case kindError:
-		label := lipgloss.NewStyle().Foreground(theme.Error).Bold(true).Render("error>")
-		body := lipgloss.NewStyle().Foreground(theme.Error).Render(" " + text)
-		return label + body
+		return renderLabeledBlock(
+			"error>",
+			text,
+			width,
+			lipgloss.NewStyle().Foreground(theme.Error).Bold(true),
+			lipgloss.NewStyle().Foreground(theme.Error),
+		)
 	case kindTool:
-		return renderToolItem(theme, item, width)
+		return renderToolItem(theme, item, width, showToolDetails)
 	default:
 		prefix := item.Prefix
 		if prefix == "" {
@@ -98,37 +103,167 @@ func renderItem(theme tuitheme.Palette, item transcriptItem, width int) string {
 	}
 }
 
-func renderToolItem(theme tuitheme.Palette, item transcriptItem, width int) string {
-	status := strings.TrimSpace(item.Meta)
-	bg := theme.ToolPendingBG
-	border := theme.Border
-	switch status {
-	case "running":
-		bg = theme.ToolRunningBG
-		border = theme.BorderActive
-	case "completed":
-		bg = theme.ToolSuccessBG
-		border = theme.Success
-	case "error":
-		bg = theme.ToolErrorBG
-		border = theme.Error
+func renderWrappedText(text string, width int, style lipgloss.Style) string {
+	if width <= 0 {
+		return style.Render(text)
+	}
+	return style.Width(width).Render(text)
+}
+
+func renderLabeledBlock(label string, text string, width int, labelStyle lipgloss.Style, bodyStyle lipgloss.Style) string {
+	if width <= 0 {
+		return labelStyle.Render(label) + bodyStyle.Render(" "+text)
 	}
 
-	cardWidth := 96
-	if width > 0 {
-		cardWidth = min(max(40, width-4), 96)
+	labelWidth := min(12, max(8, lipgloss.Width(label)+1))
+	bodyWidth := max(8, width-labelWidth)
+	left := labelStyle.Width(labelWidth).Render(label)
+	right := bodyStyle.Width(bodyWidth).Render(" " + text)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+}
+
+func renderToolItem(theme tuitheme.Palette, item transcriptItem, width int, showToolDetails bool) string {
+	status := strings.TrimSpace(item.Meta)
+	headerColor := theme.Muted
+	bodyColor := theme.ToolOutput
+	switch status {
+	case "running":
+		headerColor = theme.NoticeText
+	case "completed":
+		headerColor = theme.Muted
+	case "error":
+		headerColor = theme.Error
+		bodyColor = theme.Error
 	}
-	innerWidth := max(20, cardWidth-4)
-	title := lipgloss.NewStyle().Foreground(theme.ToolTitle).Bold(true).Render(item.Prefix)
-	meta := lipgloss.NewStyle().Foreground(theme.Muted).Render(" " + status)
-	header := lipgloss.NewStyle().Width(innerWidth).Render(title + meta)
-	body := lipgloss.NewStyle().Foreground(theme.ToolOutput).Width(innerWidth).Render(strings.TrimSpace(item.Text))
-	style := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(border).
-		Background(bg).
-		Padding(0, 1)
-	return style.Render(header + "\n" + body)
+
+	headline := summarizeToolItem(item)
+	if showToolDetails {
+		headline = item.Prefix + " • " + status
+	}
+	header := renderWrappedText(
+		headline,
+		width,
+		lipgloss.NewStyle().Foreground(headerColor),
+	)
+	if !showToolDetails {
+		return header
+	}
+
+	bodyWidth := width
+	if bodyWidth > 0 {
+		bodyWidth = max(12, width-2)
+	}
+	bodyText := indentBlock(strings.TrimSpace(item.Text), "  ")
+	body := renderWrappedText(bodyText, bodyWidth, lipgloss.NewStyle().Foreground(bodyColor))
+	return header + "\n" + body
+}
+
+func indentBlock(text string, indent string) string {
+	if strings.TrimSpace(text) == "" {
+		return ""
+	}
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		lines[i] = indent + line
+	}
+	return strings.Join(lines, "\n")
+}
+
+func summarizeToolItem(item transcriptItem) string {
+	switch item.Prefix {
+	case "tool[shell]", "tool":
+		return summarizeShellTool(extractToolArgs(item.Text), item.Meta)
+	default:
+		if strings.TrimSpace(item.Meta) == "" {
+			return "Tool activity"
+		}
+		status := strings.TrimSpace(item.Meta)
+		return strings.ToUpper(status[:1]) + status[1:]
+	}
+}
+
+func summarizeShellTool(args string, status string) string {
+	type shellArgs struct {
+		Command    string `json:"command"`
+		WorkingDir string `json:"working_dir"`
+	}
+	var parsed shellArgs
+	if err := json.Unmarshal([]byte(args), &parsed); err != nil {
+		return fallbackToolStatus(status, "Running shell command")
+	}
+	command := strings.TrimSpace(parsed.Command)
+	if command == "" {
+		return fallbackToolStatus(status, "Running shell command")
+	}
+
+	fields := strings.Fields(command)
+	if len(fields) == 0 {
+		return fallbackToolStatus(status, "Running shell command")
+	}
+
+	switch fields[0] {
+	case "cat", "head", "tail":
+		if target := lastPathToken(fields[1:]); target != "" {
+			return "Reading [" + target + "]"
+		}
+	case "sed":
+		if target := lastPathToken(fields[1:]); target != "" {
+			return "Reading [" + target + "]"
+		}
+	case "grep", "rg":
+		if target := lastPathToken(fields[1:]); target != "" {
+			return "Searching [" + target + "]"
+		}
+	case "ls":
+		if target := lastPathToken(fields[1:]); target != "" {
+			return "Listing [" + target + "]"
+		}
+		if parsed.WorkingDir != "" {
+			return "Listing [" + parsed.WorkingDir + "]"
+		}
+		return "Listing directory"
+	case "pwd":
+		return "Checking working directory"
+	case "git":
+		if len(fields) > 1 && fields[1] == "status" {
+			return "Inspecting repository state"
+		}
+	case "go":
+		if len(fields) > 1 && fields[1] == "test" {
+			return "Running tests"
+		}
+	}
+
+	return fallbackToolStatus(status, "Running ["+truncateCommand(command, 48)+"]")
+}
+
+func fallbackToolStatus(status string, fallback string) string {
+	switch strings.TrimSpace(status) {
+	case "completed":
+		return fallback
+	case "error":
+		return "Failed: " + fallback
+	default:
+		return fallback
+	}
+}
+
+func lastPathToken(tokens []string) string {
+	for i := len(tokens) - 1; i >= 0; i-- {
+		token := strings.Trim(tokens[i], "\"'")
+		if token == "" || strings.HasPrefix(token, "-") {
+			continue
+		}
+		return token
+	}
+	return ""
+}
+
+func truncateCommand(command string, limit int) string {
+	if limit <= 0 || len(command) <= limit {
+		return command
+	}
+	return strings.TrimSpace(command[:limit-3]) + "..."
 }
 
 func upsertToolGroup(items *[]transcriptItem, call tools.Call, status string) {

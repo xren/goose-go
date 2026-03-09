@@ -10,7 +10,7 @@ It does not own provider logic, tool execution, or session persistence rules. It
 - TUI state reduction
 - transcript rendering
 - input handling
-- local slash-command handling for runtime metadata and in-TUI model selection
+- local slash-command handling for runtime metadata, in-TUI model selection, and display toggles
 - runtime event consumption
 - interrupt wiring at the UI layer
 
@@ -25,6 +25,7 @@ This package now contains the full Stage 1 MVP plus the first Stage 2 interactio
 - resume by known session id
 - live rendering from `ReplyStream(...)`
 - grouped tool blocks plus compaction and failure notices
+- debug-driven transcript verbosity, controlled entirely at the TUI layer
 - interrupt of the active run
 - registry-backed model selection through `/model`
 - built-in dark/light theme selection through `--theme` and `/theme`
@@ -157,12 +158,14 @@ The TUI keeps transcript items as structured state, not only as pre-rendered str
 
 Rendering rules:
 
-- user and assistant text render as role-prefixed transcript lines
+- user and assistant text render without explicit role prefixes; color and hierarchy distinguish them instead
 - streamed assistant deltas accumulate in a temporary live buffer
 - final assistant messages replace that live buffer to avoid duplicate output
 - each tool call is grouped into one logical transcript block keyed by tool call id
-- grouped tool blocks carry args, lifecycle status, and final output/error text
-- grouped tool blocks are width-capped and wrapped inside the viewport instead of stretching to the full terminal width
+- grouped tool items carry args, lifecycle status, and final output/error text
+- tool activity now renders as subdued width-bounded transcript lines instead of bordered cards
+- compact mode renders short summaries like `Reading [path]` without showing full args/output
+- user, assistant, system, and error transcript lines are also width-bounded and wrapped inside the viewport instead of being emitted as oversized single lines
 - compaction and failure events render as system notices
 
 Current transcript replay behavior:
@@ -191,6 +194,7 @@ Current implementation detail:
 - `/help` lists the current local command surface
 - `/session` reports current session metadata from TUI/runtime state
 - `/new` resets the interactive surface to a fresh session state
+- `/debug` toggles debug mode for the current TUI session
 - `/theme` is handled locally in the TUI, opens a built-in theme picker, and updates only TUI presentation state
 - shell-triggered approval-required runs open a focused approval panel with allow/deny actions
 - `/model` is handled locally in the TUI, opens a registry-backed picker, and does not start a provider run

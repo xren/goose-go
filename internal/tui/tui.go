@@ -36,6 +36,7 @@ type Runtime interface {
 type Options struct {
 	SessionID string
 	Theme     string
+	Debug     bool
 }
 
 type itemKind string
@@ -107,6 +108,7 @@ type model struct {
 	sessions   sessionPickerState
 	themes     themePickerState
 	theme      tuitheme.Palette
+	debug      bool
 }
 
 func (m model) canScrollTranscript() bool {
@@ -180,6 +182,7 @@ func newModel(ctx context.Context, runtime Runtime, opts Options) model {
 		workingDir: runtime.WorkingDir(),
 		async:      make(chan tea.Msg, 128),
 		theme:      palette,
+		debug:      opts.Debug,
 	}
 }
 

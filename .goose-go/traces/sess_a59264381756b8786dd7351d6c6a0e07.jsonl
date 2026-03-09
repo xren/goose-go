@@ -1,0 +1,102 @@
+{"recorded_at":"2026-03-08T23:45:35.6254Z","type":"run_started","session_id":"sess_a59264381756b8786dd7351d6c6a0e07"}
+{"recorded_at":"2026-03-08T23:45:35.6287Z","type":"turn_started","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1}
+{"recorded_at":"2026-03-08T23:45:35.629308Z","type":"user_message_persisted","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","message":{"id":"msg_447f1848cd37753d","role":"user","created_at":"2026-03-08T23:45:35.625168Z","content":[{"type":"text","text":{"text":"tell me something new"}}]}}
+{"recorded_at":"2026-03-08T23:45:36.770072Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"Here"}
+{"recorded_at":"2026-03-08T23:45:36.775543Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"’s"}
+{"recorded_at":"2026-03-08T23:45:36.783954Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" something"}
+{"recorded_at":"2026-03-08T23:45:36.790529Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" you"}
+{"recorded_at":"2026-03-08T23:45:36.797949Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" might"}
+{"recorded_at":"2026-03-08T23:45:36.806679Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" not"}
+{"recorded_at":"2026-03-08T23:45:36.812265Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" have"}
+{"recorded_at":"2026-03-08T23:45:36.865103Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" recently"}
+{"recorded_at":"2026-03-08T23:45:36.866189Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"ers"}
+{"recorded_at":"2026-03-08T23:45:36.866916Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" astronom"}
+{"recorded_at":"2026-03-08T23:45:36.867354Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":":"}
+{"recorded_at":"2026-03-08T23:45:36.867718Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" heard"}
+{"recorded_at":"2026-03-08T23:45:36.868873Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" used"}
+{"recorded_at":"2026-03-08T23:45:36.872024Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" the"}
+{"recorded_at":"2026-03-08T23:45:36.877793Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" James"}
+{"recorded_at":"2026-03-08T23:45:36.887387Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" Webb"}
+{"recorded_at":"2026-03-08T23:45:36.895529Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" Space"}
+{"recorded_at":"2026-03-08T23:45:36.900724Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" Telescope"}
+{"recorded_at":"2026-03-08T23:45:36.90943Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"’s"}
+{"recorded_at":"2026-03-08T23:45:36.925442Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" mid"}
+{"recorded_at":"2026-03-08T23:45:36.932942Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"-in"}
+{"recorded_at":"2026-03-08T23:45:36.940767Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"fra"}
+{"recorded_at":"2026-03-08T23:45:36.941743Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"red"}
+{"recorded_at":"2026-03-08T23:45:36.950426Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" instrument"}
+{"recorded_at":"2026-03-08T23:45:36.957121Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" ("}
+{"recorded_at":"2026-03-08T23:45:36.965258Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"M"}
+{"recorded_at":"2026-03-08T23:45:36.97398Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":")"}
+{"recorded_at":"2026-03-08T23:45:36.974867Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"IRI"}
+{"recorded_at":"2026-03-08T23:45:36.979013Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" to"}
+{"recorded_at":"2026-03-08T23:45:36.987791Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" detect"}
+{"recorded_at":"2026-03-08T23:45:36.99458Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" complex"}
+{"recorded_at":"2026-03-08T23:45:37.004212Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" molecules"}
+{"recorded_at":"2026-03-08T23:45:37.004856Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" organic"}
+{"recorded_at":"2026-03-08T23:45:37.009645Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" called"}
+{"recorded_at":"2026-03-08T23:45:37.021556Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"cy"}
+{"recorded_at":"2026-03-08T23:45:37.02207Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" poly"}
+{"recorded_at":"2026-03-08T23:45:37.028017Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" aromatic"}
+{"recorded_at":"2026-03-08T23:45:37.029309Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"clic"}
+{"recorded_at":"2026-03-08T23:45:37.039613Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"bons"}
+{"recorded_at":"2026-03-08T23:45:37.040108Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" hydrocar"}
+{"recorded_at":"2026-03-08T23:45:37.042833Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" ("}
+{"recorded_at":"2026-03-08T23:45:37.053844Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"PA"}
+{"recorded_at":"2026-03-08T23:45:37.054874Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"Hs"}
+{"recorded_at":"2026-03-08T23:45:37.058066Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":")"}
+{"recorded_at":"2026-03-08T23:45:37.058898Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" in"}
+{"recorded_at":"2026-03-08T23:45:37.065832Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" a"}
+{"recorded_at":"2026-03-08T23:45:37.075506Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" galaxy"}
+{"recorded_at":"2026-03-08T23:45:37.079771Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" that"}
+{"recorded_at":"2026-03-08T23:45:37.090478Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" existed"}
+{"recorded_at":"2026-03-08T23:45:37.098437Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" just"}
+{"recorded_at":"2026-03-08T23:45:37.1047Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" "}
+{"recorded_at":"2026-03-08T23:45:37.115678Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" million"}
+{"recorded_at":"2026-03-08T23:45:37.116894Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"600"}
+{"recorded_at":"2026-03-08T23:45:37.121189Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" years"}
+{"recorded_at":"2026-03-08T23:45:37.122004Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" after"}
+{"recorded_at":"2026-03-08T23:45:37.123468Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" the"}
+{"recorded_at":"2026-03-08T23:45:37.127694Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" Big"}
+{"recorded_at":"2026-03-08T23:45:37.12961Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"."}
+{"recorded_at":"2026-03-08T23:45:37.130222Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" Bang"}
+{"recorded_at":"2026-03-08T23:45:37.132749Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" PA"}
+{"recorded_at":"2026-03-08T23:45:37.147996Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" are"}
+{"recorded_at":"2026-03-08T23:45:37.148689Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"Hs"}
+{"recorded_at":"2026-03-08T23:45:37.152055Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" typically"}
+{"recorded_at":"2026-03-08T23:45:37.163082Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" associated"}
+{"recorded_at":"2026-03-08T23:45:37.171604Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" with"}
+{"recorded_at":"2026-03-08T23:45:37.176889Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" later"}
+{"recorded_at":"2026-03-08T23:45:37.184205Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" stages"}
+{"recorded_at":"2026-03-08T23:45:37.19378Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" of"}
+{"recorded_at":"2026-03-08T23:45:37.201785Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" and"}
+{"recorded_at":"2026-03-08T23:45:37.202728Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" star"}
+{"recorded_at":"2026-03-08T23:45:37.211204Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" planet"}
+{"recorded_at":"2026-03-08T23:45:37.212357Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":","}
+{"recorded_at":"2026-03-08T23:45:37.212838Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" formation"}
+{"recorded_at":"2026-03-08T23:45:37.228616Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" them"}
+{"recorded_at":"2026-03-08T23:45:37.229482Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" so"}
+{"recorded_at":"2026-03-08T23:45:37.230229Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" finding"}
+{"recorded_at":"2026-03-08T23:45:37.231123Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" so"}
+{"recorded_at":"2026-03-08T23:45:37.234687Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" early"}
+{"recorded_at":"2026-03-08T23:45:37.244788Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" hints"}
+{"recorded_at":"2026-03-08T23:45:37.245519Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" that"}
+{"recorded_at":"2026-03-08T23:45:37.251847Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" the"}
+{"recorded_at":"2026-03-08T23:45:37.27517Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" building"}
+{"recorded_at":"2026-03-08T23:45:37.275562Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" basic"}
+{"recorded_at":"2026-03-08T23:45:37.298304Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" blocks"}
+{"recorded_at":"2026-03-08T23:45:37.302696Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" of"}
+{"recorded_at":"2026-03-08T23:45:37.31629Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" carbon"}
+{"recorded_at":"2026-03-08T23:45:37.321744Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"-based"}
+{"recorded_at":"2026-03-08T23:45:37.330532Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" chemistry"}
+{"recorded_at":"2026-03-08T23:45:37.338006Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" formed"}
+{"recorded_at":"2026-03-08T23:45:37.345466Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" surprisingly"}
+{"recorded_at":"2026-03-08T23:45:37.354793Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" in"}
+{"recorded_at":"2026-03-08T23:45:37.356009Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" quickly"}
+{"recorded_at":"2026-03-08T23:45:37.359375Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" the"}
+{"recorded_at":"2026-03-08T23:45:37.367291Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" universe"}
+{"recorded_at":"2026-03-08T23:45:37.373856Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"’s"}
+{"recorded_at":"2026-03-08T23:45:37.388489Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":"."}
+{"recorded_at":"2026-03-08T23:45:37.389443Z","type":"provider_text_delta","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"delta":" history"}
+{"recorded_at":"2026-03-08T23:45:37.44583Z","type":"assistant_message_complete","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","turn":1,"message":{"id":"msg_f95b996ff5759dff","role":"assistant","created_at":"2026-03-08T23:45:37.442288Z","content":[{"type":"text","text":{"text":"Here’s something you might not have heard: astronomers recently used the James Webb Space Telescope’s mid-infrared instrument (MIRI) to detect complex organic molecules called polycyclic aromatic hydrocarbons (PAHs) in a galaxy that existed just 600 million years after the Big Bang. PAHs are typically associated with later stages of star and planet formation, so finding them so early hints that the basic building blocks of carbon-based chemistry formed surprisingly quickly in the universe’s history."}}]}}
+{"recorded_at":"2026-03-08T23:45:37.450035Z","type":"run_completed","session_id":"sess_a59264381756b8786dd7351d6c6a0e07","result":{"status":"completed","session":{"id":"sess_a59264381756b8786dd7351d6c6a0e07","name":"tell me something new","working_dir":"/Users/rex/projects/goose-go","provider":"openai-codex","model":"gpt-5-codex","type":"terminal","created_at":1773013535,"updated_at":1773013537,"message_count":2,"conversation":{"messages":[{"id":"msg_447f1848cd37753d","role":"user","created_at":"2026-03-08T23:45:35.625168Z","content":[{"type":"text","text":{"text":"tell me something new"}}]},{"id":"msg_f95b996ff5759dff","role":"assistant","created_at":"2026-03-08T23:45:37.442288Z","content":[{"type":"text","text":{"text":"Here’s something you might not have heard: astronomers recently used the James Webb Space Telescope’s mid-infrared instrument (MIRI) to detect complex organic molecules called polycyclic aromatic hydrocarbons (PAHs) in a galaxy that existed just 600 million years after the Big Bang. PAHs are typically associated with later stages of star and planet formation, so finding them so early hints that the basic building blocks of carbon-based chemistry formed surprisingly quickly in the universe’s history."}}]}]}},"turns":1}}
