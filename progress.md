@@ -6,7 +6,7 @@ Build `goose-go` as a Go implementation of Goose terminal core: a local agent ru
 
 ## Current V1 Target
 
-Terminal core first. No server or desktop parity in v1. The first provider slice is Codex-first and reuses an existing `codex login`. A minimal TUI is planned only after CLI/session ergonomics and a live agent event stream exist.
+Terminal core first. No server or desktop parity in v1. The first provider slice is Codex-first with native `goose-go login` support and compatibility with an existing `codex login` cache. A minimal TUI is planned only after CLI/session ergonomics and a live agent event stream exist.
 
 ## Milestones
 
@@ -14,7 +14,7 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 | --- | --- | --- | --- | --- | --- |
 | 00 | Root setup, docs, and progress structure | done | none | Repo is the system of record and workflow targets are defined | 2026-03-08 |
 | 01 | Domain model and storage | done | 00 | Structured sessions can be created, loaded, and replayed | 2026-03-08 |
-| 02 | Provider foundation and Codex-first OpenAI provider | done | 01 | Existing `codex login` user can complete streaming chat without an API key | 2026-03-08 |
+| 02 | Provider foundation and Codex-first OpenAI provider | done | 01 | A user can authenticate natively with `goose-go login` or reuse an existing `codex login` cache and complete streaming chat without an API key | 2026-03-09 |
 | 03 | Tool runtime and developer tools | done | 01, 02 | The runtime can list and execute the initial `shell` tool | 2026-03-08 |
 | 04 | Agent loop and approvals | done | 02, 03 | Multi-turn tool-using loop works with approvals | 2026-03-08 |
 | 05 | CLI and session flow | done | 04 | Terminal session can start, inspect, resume, and interrupt cleanly | 2026-03-08 |
@@ -52,6 +52,7 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - The TUI now runs in normal screen mode without alt-screen or transcript mouse capture, so terminal-native scrolling, selection, and scrollback search work again.
 - The first markdown-rendering slice from [progress/07g-tui-markdown-rendering.md](/Users/rex/projects/goose-go/progress/07g-tui-markdown-rendering.md) is now implemented: `internal/tui/markdown` uses `goldmark`, theme-driven inline styling, and width-aware wrapping for assistant/system transcript text.
 - `internal/prompt` now exists as a concrete runtime package: `goose-go run` and `goose-go tui` eagerly load local `AGENTS.md` files from the working directory up to the git root and append them to the system prompt as project context.
+- `goose-go login` is now implemented as a native OpenAI Codex OAuth flow with PKCE, local browser callback support, manual paste fallback, and file-backed credentials under `~/.goose-go/auth.json`.
 - The root architecture diagram in [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md) is now synced to the current runtime shape, including `internal/app`, `internal/models`, `internal/compaction`, trace writing, and the live TUI/event-stream path.
 - The default runtime max-turn limit is now 10000 instead of 8, so long CLI and TUI sessions do not stop early under normal use.
 - `goose-go run /model` remains a local reporter, while `goose-go tui /model` now opens the registry-backed picker.
@@ -110,7 +111,6 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - After Milestone 05, refactor `internal/agent` around a live event stream before building any substantial TUI.
 - The future TUI must subscribe to agent events; it must not be built directly on the current blocking `agent.Reply()` path.
 - The future TUI must not use SQLite as its primary live UI transport.
-- Keep native `goose-go` login out of the first slice.
 - Keep the `goose/` submodule as reference-only material.
 
 ## Blocked / Risks
@@ -120,8 +120,8 @@ Terminal core first. No server or desktop parity in v1. The first provider slice
 - If root docs drift from implementation, agents will start making incorrect assumptions.
 - The first persistence backend is SQLite with JSON-encoded conversations; if that shape changes later, migration work will be needed.
 - The repo now has a first architecture enforcement check, but the rules are still narrow and will need to expand with the runtime.
-- The first provider slice assumes file-backed Codex credentials in `~/.codex/auth.json`; keyring-backed credentials are deferred.
-- Shared Codex auth cache refresh now exists, but it still depends on the current file-backed cache shape and not keyring-backed credentials.
+- The first provider slice now prefers file-backed Codex credentials in `~/.goose-go/auth.json` and can still reuse the legacy `~/.codex/auth.json` cache; keyring-backed credentials are deferred.
+- Shared Codex auth refresh now exists, but it still depends on the current file-backed cache shape and not keyring-backed credentials.
 - The current provider implementation is intentionally narrow: SSE only, no websocket transport, and no broader Responses surface yet.
 - Generic OpenAI API-key provider support is deferred until after the Codex-first slice is stable.
 - Structured file tools beyond `shell` are deferred; if the agent loop becomes too opaque or too permissive with shell-only execution, that scope cut may need to be revisited.

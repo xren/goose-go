@@ -33,7 +33,7 @@ flowchart LR
     A["agent/runtime"] --> B["internal/provider"]
     B --> C["internal/provider/openaicodex"]
     C --> D["internal/auth/codex"]
-    D --> E["~/.codex/auth.json"]
+    D --> E["~/.goose-go/auth.json or ~/.codex/auth.json"]
     C --> F["Codex Responses SSE API"]
 ```
 
@@ -127,7 +127,7 @@ The translation is intentionally local to this package. Codex wire DTOs must not
 
 ### 2. Auth header construction
 
-The provider does not parse `~/.codex/auth.json` itself. It delegates to `internal/auth/codex`, which returns normalized credentials.
+The provider does not parse auth files itself. It delegates to `internal/auth/codex`, which returns normalized credentials from native `goose-go` auth state first and the legacy Codex CLI cache as fallback.
 
 The provider then builds the Codex-specific headers:
 
@@ -171,7 +171,6 @@ The current `openaicodex` implementation is intentionally limited:
 - SSE only
 - no websocket transport
 - no broader Responses surface beyond the current normalized event set
-- no native login flow
 - no keyring-backed credentials
 - no runtime tool execution wiring yet
 

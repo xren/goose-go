@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -166,6 +168,103 @@ func TestResolveRefreshesExpiredTokenAndPreservesFields(t *testing.T) {
 	}
 }
 
+func TestResolveReloadsFileAfterLockAndSkipsRedundantRefresh(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0).UTC()
+	path := filepath.Join(t.TempDir(), "auth.json")
+	writeFixture(t, path, authFixture{
+		AuthMode: "chatgpt",
+		Tokens: authFixtureTokens{
+			AccessToken:  makeJWT(t, jwtFixture{Exp: now.Add(2 * time.Minute), ClientID: "client_old", AccountID: "acct_old"}),
+			RefreshToken: "refresh_old",
+		},
+	})
+
+	var refreshCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		refreshCalls.Add(1)
+		t.Fatalf("did not expect refresh request after file was updated before lock release")
+	}))
+	defer server.Close()
+
+	locker := stubLockManager{
+		lock: func(ctx context.Context, lockPath string) (func(), error) {
+			writeFixture(t, path, authFixture{
+				AuthMode: "chatgpt",
+				Tokens: authFixtureTokens{
+					AccessToken:  makeJWT(t, jwtFixture{Exp: now.Add(time.Hour), ClientID: "client_new", AccountID: "acct_new"}),
+					RefreshToken: "refresh_new",
+				},
+			})
+			return func() {}, nil
+		},
+	}
+
+	reader, err := NewReader(
+		WithAuthPath(path),
+		WithNow(func() time.Time { return now }),
+		WithTokenURL(server.URL),
+		WithHTTPClient(server.Client()),
+		WithLockManager(locker),
+	)
+	if err != nil {
+		t.Fatalf("new reader: %v", err)
+	}
+
+	creds, err := reader.Resolve(context.Background())
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if creds.AccountID != "acct_new" || creds.RefreshToken != "refresh_new" {
+		t.Fatalf("expected reloaded credentials from disk, got %+v", creds)
+	}
+	if refreshCalls.Load() != 0 {
+		t.Fatalf("expected zero refresh calls, got %d", refreshCalls.Load())
+	}
+}
+
+func TestResolveReloadsFreshCredentialsAfterRefreshFailure(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0).UTC()
+	path := filepath.Join(t.TempDir(), "auth.json")
+	writeFixture(t, path, authFixture{
+		AuthMode: "chatgpt",
+		Tokens: authFixtureTokens{
+			AccessToken:  makeJWT(t, jwtFixture{Exp: now.Add(2 * time.Minute), ClientID: "client_old", AccountID: "acct_old"}),
+			RefreshToken: "refresh_old",
+		},
+	})
+
+	client := &http.Client{
+		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			writeFixture(t, path, authFixture{
+				AuthMode: "chatgpt",
+				Tokens: authFixtureTokens{
+					AccessToken:  makeJWT(t, jwtFixture{Exp: now.Add(time.Hour), ClientID: "client_new", AccountID: "acct_new"}),
+					RefreshToken: "refresh_new",
+				},
+			})
+			return nil, errors.New("boom")
+		}),
+	}
+
+	reader, err := NewReader(
+		WithAuthPath(path),
+		WithNow(func() time.Time { return now }),
+		WithHTTPClient(client),
+		WithLockManager(stubLockManager{lock: func(ctx context.Context, lockPath string) (func(), error) { return func() {}, nil }}),
+	)
+	if err != nil {
+		t.Fatalf("new reader: %v", err)
+	}
+
+	creds, err := reader.Resolve(context.Background())
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if creds.AccountID != "acct_new" || creds.RefreshToken != "refresh_new" {
+		t.Fatalf("expected reloaded credentials after refresh failure, got %+v", creds)
+	}
+}
+
 func TestResolveRejectsMissingAuthFile(t *testing.T) {
 	reader, err := NewReader(WithAuthPath(filepath.Join(t.TempDir(), "missing.json")))
 	if err != nil {
@@ -173,7 +272,7 @@ func TestResolveRejectsMissingAuthFile(t *testing.T) {
 	}
 
 	_, err = reader.Resolve(context.Background())
-	if err == nil || !strings.Contains(err.Error(), "codex login") {
+	if err == nil || (!strings.Contains(err.Error(), "goose-go login") && !strings.Contains(err.Error(), "codex login")) {
 		t.Fatalf("expected actionable login error, got %v", err)
 	}
 }
@@ -189,6 +288,82 @@ func TestDefaultAuthPathUsesEnvOverride(t *testing.T) {
 
 	if got != path {
 		t.Fatalf("expected %q, got %q", path, got)
+	}
+}
+
+func TestDefaultAuthPathPrefersNativeGooseAuth(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv(AuthFileEnvVar, "")
+
+	nativePath := filepath.Join(home, authDirName, authFileName)
+	if err := os.MkdirAll(filepath.Dir(nativePath), 0o700); err != nil {
+		t.Fatalf("mkdir native dir: %v", err)
+	}
+	if err := os.WriteFile(nativePath, []byte("{}\n"), 0o600); err != nil {
+		t.Fatalf("write native auth: %v", err)
+	}
+
+	legacyPath := filepath.Join(home, ".codex", authFileName)
+	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o700); err != nil {
+		t.Fatalf("mkdir legacy dir: %v", err)
+	}
+	if err := os.WriteFile(legacyPath, []byte("{}\n"), 0o600); err != nil {
+		t.Fatalf("write legacy auth: %v", err)
+	}
+
+	got, err := defaultAuthPath()
+	if err != nil {
+		t.Fatalf("default auth path: %v", err)
+	}
+	if got != nativePath {
+		t.Fatalf("expected native path %q, got %q", nativePath, got)
+	}
+}
+
+func TestDefaultAuthPathFallsBackToLegacyCodexAuth(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv(AuthFileEnvVar, "")
+
+	legacyPath := filepath.Join(home, ".codex", authFileName)
+	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o700); err != nil {
+		t.Fatalf("mkdir legacy dir: %v", err)
+	}
+	if err := os.WriteFile(legacyPath, []byte("{}\n"), 0o600); err != nil {
+		t.Fatalf("write legacy auth: %v", err)
+	}
+
+	got, err := defaultAuthPath()
+	if err != nil {
+		t.Fatalf("default auth path: %v", err)
+	}
+	if got != legacyPath {
+		t.Fatalf("expected legacy path %q, got %q", legacyPath, got)
+	}
+}
+
+func TestFileLockManagerCreatesParentDir(t *testing.T) {
+	lockPath := filepath.Join(t.TempDir(), "missing", "auth.json.lock")
+	manager := fileLockManager{
+		now:        func() time.Time { return time.Now().UTC() },
+		sleep:      func(time.Duration) {},
+		staleAfter: defaultLockTTL,
+		poll:       defaultLockPoll,
+	}
+
+	unlock, err := manager.Lock(context.Background(), lockPath)
+	if err != nil {
+		t.Fatalf("lock: %v", err)
+	}
+
+	if _, err := os.Stat(lockPath); err != nil {
+		t.Fatalf("expected lock file to exist: %v", err)
+	}
+
+	unlock()
+	if _, err := os.Stat(lockPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected lock file to be removed, got %v", err)
 	}
 }
 
@@ -212,6 +387,20 @@ type jwtFixture struct {
 	Exp       time.Time
 	ClientID  string
 	AccountID string
+}
+
+type stubLockManager struct {
+	lock func(ctx context.Context, path string) (func(), error)
+}
+
+func (m stubLockManager) Lock(ctx context.Context, path string) (func(), error) {
+	return m.lock(ctx, path)
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
 }
 
 func writeFixture(t *testing.T, path string, fixture authFixture) {

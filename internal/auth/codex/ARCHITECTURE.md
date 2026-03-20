@@ -7,25 +7,32 @@ It translates the local Codex auth cache into normalized credentials that provid
 ## Code Map
 
 - `Reader`
-  Loads, validates, refreshes, and rewrites the local Codex auth state.
+  Loads, validates, refreshes, locks, and rewrites the local Codex auth state.
 - `Credentials`
   Normalized output passed to provider code.
 - auth-file parsing
   Decodes the local cache format and extracts account identity and token claims.
 - refresh flow
   Exchanges the refresh token for a new access token when the cached token is near expiry.
+- lock manager
+  Serializes refresh/write access to the shared auth cache so multiple `goose-go` processes do not race.
 
 ## Credential Flow
 
 ```mermaid
 flowchart LR
-    A["~/.codex/auth.json"] --> B["internal/auth/codex.Reader"]
+    A["~/.goose-go/auth.json"] --> B["internal/auth/codex.Reader"]
+    A2["~/.codex/auth.json (legacy fallback)"] --> B
     B --> C{"access token fresh enough?"}
     C -- "yes" --> D["Credentials"]
-    C -- "no" --> E["refresh token request"]
-    E --> F["updated auth.json"]
-    F --> D
-    D --> G["internal/provider/openaicodex"]
+    C -- "no" --> E["acquire auth lock"]
+    E --> F["reload auth.json"]
+    F --> G{"still stale?"}
+    G -- "no" --> D
+    G -- "yes" --> H["refresh token request"]
+    H --> I["updated auth.json"]
+    I --> D
+    D --> J["internal/provider/openaicodex"]
 ```
 
 ## Boundaries
@@ -38,9 +45,12 @@ flowchart LR
 
 - failure normalization: this package returns concrete causes that the app layer later maps into stable diagnostics
 - local state updates: refresh mutates the on-disk auth cache, so file format handling must stay centralized here
+- cross-process coordination: refresh is guarded by a lock file and re-checks disk after lock acquisition
 - security: credentials stay file-backed and process-local in the current slice
 
 ## Current Constraints
 
-- only the current file-backed Codex login cache is supported
+- native `goose-go login` writes the preferred file-backed Codex cache at `~/.goose-go/auth.json`
+- the legacy `~/.codex/auth.json` cache remains a compatibility fallback
 - keyring-backed auth and broader login flows are intentionally deferred
+- refresh-failure recovery prefers reloading disk state before failing, so another process can win the refresh race safely

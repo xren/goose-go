@@ -92,7 +92,7 @@ func classifyProviderError(providerName string, err error) *DiagnosticError {
 			Category: DiagnosticAuthMissing,
 			Provider: providerName,
 			Summary:  "credentials were not found",
-			Hint:     "run `codex login`",
+			Hint:     "run `goose-go login` or `codex login`",
 			Cause:    err,
 		}
 	case strings.Contains(msg, "decode codex auth file"),
@@ -103,7 +103,7 @@ func classifyProviderError(providerName string, err error) *DiagnosticError {
 			Category: DiagnosticAuthInvalid,
 			Provider: providerName,
 			Summary:  "credentials are invalid or unreadable",
-			Hint:     "re-run `codex login`",
+			Hint:     "re-run `goose-go login` or `codex login`",
 			Cause:    err,
 		}
 	case strings.Contains(msg, "refresh codex token"),
@@ -112,7 +112,7 @@ func classifyProviderError(providerName string, err error) *DiagnosticError {
 			Category: DiagnosticAuthRefreshFailed,
 			Provider: providerName,
 			Summary:  "credential refresh failed",
-			Hint:     "re-run `codex login`",
+			Hint:     "re-run `goose-go login` or `codex login`",
 			Cause:    err,
 		}
 	case strings.Contains(msg, "codex request failed: status"):

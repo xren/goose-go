@@ -25,26 +25,26 @@ Not in v1:
 
 ## Upstream Reference
 
-The [goose](/Users/rex/projects/goose-go/goose) submodule is the reference implementation. It is read-only in this repo and exists for architecture study, behavior comparison, and implementation notes.
+The [goose](goose) submodule is the reference implementation. It is read-only in this repo and exists for architecture study, behavior comparison, and implementation notes.
 
 ## Repo Map
 
-- [AGENTS.md](/Users/rex/projects/goose-go/AGENTS.md): short navigation guide for agents
-- [docs/design-principles.md](/Users/rex/projects/goose-go/docs/design-principles.md): project design rules derived from the agent-first harness approach
-- [docs/architecture.md](/Users/rex/projects/goose-go/docs/architecture.md): target package layout, boundaries, and index of subsystem `ARCHITECTURE.md` files
-- [internal/agent/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/agent/ARCHITECTURE.md): high-level architecture of the runtime loop and approval flow
-- [internal/session/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/session/ARCHITECTURE.md): session store boundary, summaries, and SQLite relationship
-- [internal/tools/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tools/ARCHITECTURE.md): high-level architecture of the tool runtime and first concrete tool
-- [internal/compaction/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/compaction/ARCHITECTURE.md): compaction planning layer, cut-point logic, and active-context reconstruction
-- [internal/provider/openaicodex/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/provider/openaicodex/ARCHITECTURE.md): high-level architecture of the first concrete provider
-- [internal/evals/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/evals/ARCHITECTURE.md): deterministic runtime eval harness and trace-based regression model
-- [internal/tui/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/ARCHITECTURE.md): Bubble Tea frontend architecture over the live agent event stream
-- [internal/tui/markdown/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/markdown/ARCHITECTURE.md): inline markdown rendering for assistant/system transcript content
-- [internal/tui/theme/ARCHITECTURE.md](/Users/rex/projects/goose-go/internal/tui/theme/ARCHITECTURE.md): semantic TUI theme tokens and built-in dark/light theme model
-- [docs/invariants.md](/Users/rex/projects/goose-go/docs/invariants.md): hard rules for the project
-- [docs/goose-reference.md](/Users/rex/projects/goose-go/docs/goose-reference.md): what to copy, defer, or ignore from upstream Goose
-- [docs/evals.md](/Users/rex/projects/goose-go/docs/evals.md): future smoke and eval strategy
-- [progress.md](/Users/rex/projects/goose-go/progress.md): project rollup and milestone status
+- [AGENTS.md](AGENTS.md): short navigation guide for agents
+- [docs/design-principles.md](docs/design-principles.md): project design rules derived from the agent-first harness approach
+- [docs/architecture.md](docs/architecture.md): target package layout, boundaries, and index of subsystem `ARCHITECTURE.md` files
+- [internal/agent/ARCHITECTURE.md](internal/agent/ARCHITECTURE.md): high-level architecture of the runtime loop and approval flow
+- [internal/session/ARCHITECTURE.md](internal/session/ARCHITECTURE.md): session store boundary, summaries, and SQLite relationship
+- [internal/tools/ARCHITECTURE.md](internal/tools/ARCHITECTURE.md): high-level architecture of the tool runtime and first concrete tool
+- [internal/compaction/ARCHITECTURE.md](internal/compaction/ARCHITECTURE.md): compaction planning layer, cut-point logic, and active-context reconstruction
+- [internal/provider/openaicodex/ARCHITECTURE.md](internal/provider/openaicodex/ARCHITECTURE.md): high-level architecture of the first concrete provider
+- [internal/evals/ARCHITECTURE.md](internal/evals/ARCHITECTURE.md): deterministic runtime eval harness and trace-based regression model
+- [internal/tui/ARCHITECTURE.md](internal/tui/ARCHITECTURE.md): Bubble Tea frontend architecture over the live agent event stream
+- [internal/tui/markdown/ARCHITECTURE.md](internal/tui/markdown/ARCHITECTURE.md): inline markdown rendering for assistant/system transcript content
+- [internal/tui/theme/ARCHITECTURE.md](internal/tui/theme/ARCHITECTURE.md): semantic TUI theme tokens and built-in dark/light theme model
+- [docs/invariants.md](docs/invariants.md): hard rules for the project
+- [docs/goose-reference.md](docs/goose-reference.md): what to copy, defer, or ignore from upstream Goose
+- [docs/evals.md](docs/evals.md): future smoke and eval strategy
+- [progress.md](progress.md): project rollup and milestone status
 - `progress/`: milestone-by-milestone implementation tracking
 
 ## Prerequisites
@@ -83,7 +83,15 @@ To prove the current Codex provider path end to end, run:
 go run ./cmd/goose-go provider-smoke
 ```
 
-This uses the real `openai-codex` provider, reads the existing `codex login` cache, sends a tiny prompt, and streams the result to the terminal.
+This uses the real `openai-codex` provider, reads native `goose-go` Codex credentials from `~/.goose-go/auth.json` when present, falls back to the existing `codex login` cache in `~/.codex/auth.json`, sends a tiny prompt, and streams the result to the terminal.
+
+To authenticate natively with `goose-go`, run:
+
+```sh
+go run ./cmd/goose-go login
+```
+
+This starts the OpenAI Codex OAuth flow, opens a browser when possible, accepts a pasted authorization code or redirect URL as fallback, and writes credentials to `~/.goose-go/auth.json`.
 
 To inspect the translated request, redacted headers, raw SSE events, and normalized provider events:
 

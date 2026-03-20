@@ -97,7 +97,7 @@ flowchart LR
 
     P --> OPC["internal/provider/openaicodex"]
     OPC --> AU["internal/auth/codex"]
-    AU --> AF["~/.codex/auth.json"]
+    AU --> AF["~/.goose-go/auth.json or ~/.codex/auth.json"]
 
     TO --> SH["internal/tools/shell"]
     ST --> DB[(".goose-go/sessions.db")]

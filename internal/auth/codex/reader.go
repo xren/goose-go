@@ -17,11 +17,16 @@ import (
 
 const (
 	AuthFileEnvVar  = "GOOSE_GO_CODEX_AUTH_FILE"
+	authDirName     = ".goose-go"
+	authFileName    = "auth.json"
 	defaultTokenURL = "https://auth.openai.com/oauth/token"
 	authClaimKey    = "https://api.openai.com/auth"
 	defaultAuthMode = "chatgpt"
 	refreshSkew     = 5 * time.Minute
 	defaultFilePerm = 0o600
+	defaultDirPerm  = 0o700
+	defaultLockTTL  = 30 * time.Second
+	defaultLockPoll = 100 * time.Millisecond
 )
 
 type Reader struct {
@@ -29,6 +34,7 @@ type Reader struct {
 	tokenURL string
 	client   *http.Client
 	now      func() time.Time
+	locker   lockManager
 }
 
 type Option func(*Reader)
@@ -75,6 +81,17 @@ type tokenResponse struct {
 
 type fieldValues map[string]json.RawMessage
 
+type lockManager interface {
+	Lock(ctx context.Context, path string) (func(), error)
+}
+
+type fileLockManager struct {
+	now        func() time.Time
+	sleep      func(time.Duration)
+	staleAfter time.Duration
+	poll       time.Duration
+}
+
 func NewReader(opts ...Option) (*Reader, error) {
 	path, err := defaultAuthPath()
 	if err != nil {
@@ -86,6 +103,12 @@ func NewReader(opts ...Option) (*Reader, error) {
 		tokenURL: defaultTokenURL,
 		client:   http.DefaultClient,
 		now:      func() time.Time { return time.Now().UTC() },
+		locker: fileLockManager{
+			now:        func() time.Time { return time.Now().UTC() },
+			sleep:      time.Sleep,
+			staleAfter: defaultLockTTL,
+			poll:       defaultLockPoll,
+		},
 	}
 
 	for _, opt := range opts {
@@ -116,6 +139,16 @@ func WithHTTPClient(client *http.Client) Option {
 func WithNow(now func() time.Time) Option {
 	return func(r *Reader) {
 		r.now = now
+		if locker, ok := r.locker.(fileLockManager); ok {
+			locker.now = now
+			r.locker = locker
+		}
+	}
+}
+
+func WithLockManager(locker lockManager) Option {
+	return func(r *Reader) {
+		r.locker = locker
 	}
 }
 
@@ -134,8 +167,36 @@ func (r *Reader) Resolve(ctx context.Context) (Credentials, error) {
 		return creds, nil
 	}
 
+	if r.locker == nil {
+		return Credentials{}, errors.New("codex auth lock manager is required")
+	}
+	unlock, err := r.locker.Lock(ctx, r.authPath+".lock")
+	if err != nil {
+		return Credentials{}, fmt.Errorf("lock codex auth file: %w", err)
+	}
+	defer unlock()
+
+	file, err = r.load()
+	if err != nil {
+		return Credentials{}, err
+	}
+	creds, err = r.credentialsFromFile(file)
+	if err != nil {
+		return Credentials{}, err
+	}
+	if !r.needsRefresh(creds.ExpiresAt) {
+		return creds, nil
+	}
+
 	updated, err := r.refresh(ctx, file, creds)
 	if err != nil {
+		reloaded, reloadErr := r.load()
+		if reloadErr == nil {
+			reloadedCreds, credsErr := r.credentialsFromFile(reloaded)
+			if credsErr == nil && !r.needsRefresh(reloadedCreds.ExpiresAt) {
+				return reloadedCreds, nil
+			}
+		}
 		return Credentials{}, err
 	}
 
@@ -147,19 +208,57 @@ func defaultAuthPath() (string, error) {
 		return override, nil
 	}
 
+	nativePath, err := nativeAuthPath()
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(nativePath); err == nil {
+		return nativePath, nil
+	}
+
+	legacyPath, err := legacyAuthPath()
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(legacyPath); err == nil {
+		return legacyPath, nil
+	}
+
+	return nativePath, nil
+}
+
+func nativeAuthPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve home dir: %w", err)
 	}
+	return filepath.Join(homeDir, authDirName, authFileName), nil
+}
 
-	return filepath.Join(homeDir, ".codex", "auth.json"), nil
+func legacyAuthPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve home dir: %w", err)
+	}
+	return filepath.Join(homeDir, ".codex", authFileName), nil
+}
+
+func writableAuthPath() (string, error) {
+	if override := os.Getenv(AuthFileEnvVar); override != "" {
+		return override, nil
+	}
+	return nativeAuthPath()
+}
+
+func loginHint() string {
+	return "run `goose-go login` or `codex login`"
 }
 
 func (r *Reader) load() (authFile, error) {
 	data, err := os.ReadFile(r.authPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return authFile{}, fmt.Errorf("codex auth file not found at %s; run `codex login`", r.authPath)
+			return authFile{}, fmt.Errorf("codex auth file not found at %s; %s", r.authPath, loginHint())
 		}
 		return authFile{}, fmt.Errorf("read codex auth file: %w", err)
 	}
@@ -174,11 +273,11 @@ func (r *Reader) load() (authFile, error) {
 
 func (r *Reader) credentialsFromFile(file authFile) (Credentials, error) {
 	if file.AuthMode != "" && file.AuthMode != defaultAuthMode {
-		return Credentials{}, fmt.Errorf("codex auth mode %q is not supported; run `codex login`", file.AuthMode)
+		return Credentials{}, fmt.Errorf("codex auth mode %q is not supported; %s", file.AuthMode, loginHint())
 	}
 
 	if file.Tokens.AccessToken == "" || file.Tokens.RefreshToken == "" {
-		return Credentials{}, errors.New("codex auth file is missing access or refresh token; run `codex login`")
+		return Credentials{}, fmt.Errorf("codex auth file is missing access or refresh token; %s", loginHint())
 	}
 
 	accessClaims, err := parseTokenClaims(file.Tokens.AccessToken)
@@ -197,7 +296,7 @@ func (r *Reader) credentialsFromFile(file authFile) (Credentials, error) {
 		}
 	}
 	if accountID == "" {
-		return Credentials{}, errors.New("codex auth file is missing account_id and access token claim; run `codex login`")
+		return Credentials{}, fmt.Errorf("codex auth file is missing account_id and access token claim; %s", loginHint())
 	}
 
 	lastRefresh, err := parseLastRefresh(file.LastRefresh)
@@ -238,7 +337,7 @@ func (r *Reader) needsRefresh(expiresAt time.Time) bool {
 
 func (r *Reader) refresh(ctx context.Context, file authFile, creds Credentials) (authFile, error) {
 	if creds.ClientID == "" {
-		return authFile{}, errors.New("codex access token is missing client_id claim; run `codex login`")
+		return authFile{}, fmt.Errorf("codex access token is missing client_id claim; %s", loginHint())
 	}
 
 	form := url.Values{}
@@ -322,7 +421,7 @@ func writeAuthFileAtomically(path string, file authFile) error {
 	}
 	data = append(data, '\n')
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), defaultDirPerm); err != nil {
 		return fmt.Errorf("ensure auth dir: %w", err)
 	}
 
@@ -402,6 +501,42 @@ func (f authFile) MarshalJSON() ([]byte, error) {
 	out["tokens"] = value
 
 	return json.Marshal(out)
+}
+
+func (m fileLockManager) Lock(ctx context.Context, path string) (func(), error) {
+	if err := os.MkdirAll(filepath.Dir(path), defaultDirPerm); err != nil {
+		return nil, fmt.Errorf("ensure auth lock dir: %w", err)
+	}
+	for {
+		lockFile, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, defaultFilePerm)
+		if err == nil {
+			_ = lockFile.Close()
+			return func() {
+				_ = os.Remove(path)
+			}, nil
+		}
+		if !errors.Is(err, os.ErrExist) {
+			return nil, err
+		}
+		if m.isStale(path) {
+			_ = os.Remove(path)
+			continue
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+		m.sleep(m.poll)
+	}
+}
+
+func (m fileLockManager) isStale(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return m.now().Sub(info.ModTime()) > m.staleAfter
 }
 
 func (t *authTokens) UnmarshalJSON(data []byte) error {

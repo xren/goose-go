@@ -29,6 +29,15 @@ func run(args []string) error {
 	}
 
 	switch args[0] {
+	case "login":
+		fs := flag.NewFlagSet("login", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		ctx, cancel := app.RunAgentContext()
+		defer cancel()
+		return app.LoginCodex(ctx, os.Stdin, os.Stdout)
 	case "run":
 		fs := flag.NewFlagSet("run", flag.ContinueOnError)
 		fs.SetOutput(os.Stderr)

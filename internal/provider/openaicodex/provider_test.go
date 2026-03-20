@@ -104,6 +104,18 @@ func TestNewProviderDoesNotSetClientTimeout(t *testing.T) {
 	if transport.ResponseHeaderTimeout != defaultResponseHeaderTimeout {
 		t.Fatalf("expected response header timeout %s, got %s", defaultResponseHeaderTimeout, transport.ResponseHeaderTimeout)
 	}
+	if transport.ForceAttemptHTTP2 {
+		t.Fatal("expected HTTP/2 to be disabled for codex SSE transport")
+	}
+	if len(transport.TLSNextProto) != 0 {
+		t.Fatalf("expected empty TLSNextProto map to disable HTTP/2, got %d entries", len(transport.TLSNextProto))
+	}
+	if transport.TLSClientConfig == nil {
+		t.Fatal("expected TLS client config")
+	}
+	if len(transport.TLSClientConfig.NextProtos) != 1 || transport.TLSClientConfig.NextProtos[0] != "http/1.1" {
+		t.Fatalf("expected ALPN to force http/1.1, got %#v", transport.TLSClientConfig.NextProtos)
+	}
 }
 
 func TestProcessStream(t *testing.T) {
@@ -114,7 +126,7 @@ func TestProcessStream(t *testing.T) {
 		"data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"usage\":{\"input_tokens\":10,\"output_tokens\":5,\"total_tokens\":15,\"input_tokens_details\":{\"cached_tokens\":2}}}}\n\n"
 
 	events := make(chan provider.Event, 10)
-	if err := processStream(strings.NewReader(stream), events, nil); err != nil {
+	if err := processStream(strings.NewReader(stream), events, nil, nil); err != nil {
 		t.Fatalf("process stream: %v", err)
 	}
 	close(events)
@@ -144,6 +156,37 @@ func TestProcessStream(t *testing.T) {
 	}
 	if got[3].Type != provider.EventTypeDone {
 		t.Fatalf("expected done event")
+	}
+}
+
+func TestProcessStreamHandlesCRLFSeparatedEvents(t *testing.T) {
+	stream := "" +
+		"data: {\"type\":\"response.output_text.delta\",\"delta\":\"pong\"}\r\n\r\n" +
+		"data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"message\",\"id\":\"msg_1\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"pong\"}]}}\r\n\r\n" +
+		"data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"usage\":{\"input_tokens\":4,\"output_tokens\":1,\"total_tokens\":5,\"input_tokens_details\":{\"cached_tokens\":0}}}}\r\n\r\n"
+
+	events := make(chan provider.Event, 10)
+	if err := processStream(strings.NewReader(stream), events, nil, nil); err != nil {
+		t.Fatalf("process stream: %v", err)
+	}
+	close(events)
+
+	var got []provider.Event
+	for event := range events {
+		got = append(got, event)
+	}
+
+	if len(got) != 4 {
+		t.Fatalf("expected 4 events, got %d", len(got))
+	}
+	if got[0].Type != provider.EventTypeTextDelta || got[0].Delta != "pong" {
+		t.Fatalf("unexpected first event: %#v", got[0])
+	}
+	if got[2].Type != provider.EventTypeMessageComplete {
+		t.Fatalf("expected message complete event, got %#v", got[2])
+	}
+	if got[3].Type != provider.EventTypeDone {
+		t.Fatalf("expected done event, got %#v", got[3])
 	}
 }
 
@@ -295,6 +338,70 @@ func TestStream(t *testing.T) {
 
 	if !sawMessage || !sawDone {
 		t.Fatalf("expected message complete and done events")
+	}
+}
+
+func TestStreamTimesOutWhenNoSSEEventArrives(t *testing.T) {
+	authPath := filepath.Join(t.TempDir(), "auth.json")
+	if err := os.WriteFile(authPath, []byte(authFixture(t, time.Now().Add(time.Hour))), 0o600); err != nil {
+		t.Fatalf("write auth fixture: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("expected flusher")
+		}
+		flusher.Flush()
+		time.Sleep(250 * time.Millisecond)
+	}))
+	defer server.Close()
+
+	reader, err := codexauth.NewReader(
+		codexauth.WithAuthPath(authPath),
+		codexauth.WithNow(func() time.Time { return time.Now().UTC() }),
+	)
+	if err != nil {
+		t.Fatalf("new auth reader: %v", err)
+	}
+
+	p, err := New(
+		WithAuthReader(reader),
+		WithBaseURL(server.URL),
+		WithFirstEventTimeout(50*time.Millisecond),
+	)
+	if err != nil {
+		t.Fatalf("new provider: %v", err)
+	}
+
+	stream, err := p.Stream(context.Background(), provider.Request{
+		SystemPrompt: "You are helpful.",
+		Messages: []conversation.Message{
+			conversation.NewMessage(conversation.RoleUser, conversation.Text("reply with pong")),
+		},
+		Model: provider.ModelConfig{
+			Provider: "openai-codex",
+			Model:    "gpt-5-codex",
+		},
+	})
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+
+	select {
+	case event, ok := <-stream:
+		if !ok {
+			t.Fatal("expected timeout error event")
+		}
+		if event.Type != provider.EventTypeError {
+			t.Fatalf("expected error event, got %#v", event)
+		}
+		if !strings.Contains(event.Err.Error(), "timed out waiting for first codex stream event") {
+			t.Fatalf("expected first-event timeout error, got %v", event.Err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for provider timeout event")
 	}
 }
 

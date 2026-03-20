@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	codexauth "goose-go/internal/auth/codex"
@@ -19,14 +22,16 @@ import (
 
 const (
 	defaultBaseURL               = "https://chatgpt.com/backend-api"
-	defaultResponseHeaderTimeout = 2 * time.Minute
+	defaultResponseHeaderTimeout = 30 * time.Second
+	defaultFirstEventTimeout     = 20 * time.Second
 )
 
 type Provider struct {
-	authReader *codexauth.Reader
-	baseURL    string
-	client     *http.Client
-	debugOut   io.Writer
+	authReader        *codexauth.Reader
+	baseURL           string
+	client            *http.Client
+	debugOut          io.Writer
+	firstEventTimeout time.Duration
 }
 
 type Option func(*Provider)
@@ -120,7 +125,8 @@ func New(opts ...Option) (*Provider, error) {
 		// Streaming responses should not use a whole-request timeout because SSE
 		// streams can legitimately run for a long time. Bound only the wait for
 		// initial response headers so stalled requests fail instead of hanging.
-		client: &http.Client{Transport: newDefaultTransport()},
+		client:            &http.Client{Transport: newDefaultTransport()},
+		firstEventTimeout: defaultFirstEventTimeout,
 	}
 
 	for _, opt := range opts {
@@ -154,12 +160,29 @@ func WithDebugWriter(w io.Writer) Option {
 	}
 }
 
+func WithFirstEventTimeout(timeout time.Duration) Option {
+	return func(p *Provider) {
+		p.firstEventTimeout = timeout
+	}
+}
+
 func newDefaultTransport() http.RoundTripper {
 	base, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		return http.DefaultTransport
 	}
 	clone := base.Clone()
+	// Codex SSE requests have been observed to stall indefinitely on the Go
+	// HTTP/2 client path for some prompts while the same requests complete over
+	// HTTP/1.1. Keep the transport on HTTP/1.1 until the backend path is stable.
+	clone.ForceAttemptHTTP2 = false
+	clone.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	if clone.TLSClientConfig == nil {
+		clone.TLSClientConfig = &tls.Config{}
+	} else {
+		clone.TLSClientConfig = clone.TLSClientConfig.Clone()
+	}
+	clone.TLSClientConfig.NextProtos = []string{"http/1.1"}
 	clone.ResponseHeaderTimeout = defaultResponseHeaderTimeout
 	return clone
 }
@@ -191,8 +214,10 @@ func (p *Provider) Stream(ctx context.Context, req provider.Request) (<-chan pro
 		return nil, fmt.Errorf("marshal request body: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, resolveURL(p.baseURL), bytes.NewReader(payload))
+	reqCtx, cancelReq := context.WithCancel(ctx)
+	httpReq, err := http.NewRequestWithContext(reqCtx, http.MethodPost, resolveURL(p.baseURL), bytes.NewReader(payload))
 	if err != nil {
+		cancelReq()
 		return nil, fmt.Errorf("build codex request: %w", err)
 	}
 
@@ -205,10 +230,12 @@ func (p *Provider) Stream(ctx context.Context, req provider.Request) (<-chan pro
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
+		cancelReq()
 		return nil, fmt.Errorf("send codex request: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		cancelReq()
 		defer func() { _ = resp.Body.Close() }()
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("codex request failed: status %d: %s", resp.StatusCode, string(body))
@@ -217,9 +244,30 @@ func (p *Provider) Stream(ctx context.Context, req provider.Request) (<-chan pro
 	events := make(chan provider.Event)
 	go func() {
 		defer close(events)
+		defer cancelReq()
 		defer func() { _ = resp.Body.Close() }()
 
-		if err := processStream(resp.Body, events, p.debugOut); err != nil {
+		var firstEventTimedOut atomic.Bool
+		var timer *time.Timer
+		var once sync.Once
+		onRawEvent := func() {
+			once.Do(func() {
+				if timer != nil {
+					timer.Stop()
+				}
+			})
+		}
+		if p.firstEventTimeout > 0 {
+			timer = time.AfterFunc(p.firstEventTimeout, func() {
+				firstEventTimedOut.Store(true)
+				cancelReq()
+			})
+		}
+
+		if err := processStream(resp.Body, events, p.debugOut, onRawEvent); err != nil {
+			if firstEventTimedOut.Load() {
+				err = fmt.Errorf("timed out waiting for first codex stream event after %s", p.firstEventTimeout)
+			}
 			events <- provider.Event{Type: provider.EventTypeError, Err: err}
 		}
 	}()
@@ -347,7 +395,7 @@ func resolveURL(baseURL string) string {
 	}
 }
 
-func processStream(body io.Reader, events chan<- provider.Event, debugOut io.Writer) error {
+func processStream(body io.Reader, events chan<- provider.Event, debugOut io.Writer, onRawEvent func()) error {
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
@@ -368,6 +416,9 @@ func processStream(body io.Reader, events chan<- provider.Event, debugOut io.Wri
 		var event sseEvent
 		if err := json.Unmarshal([]byte(payload), &event); err != nil {
 			return fmt.Errorf("decode SSE event: %w", err)
+		}
+		if onRawEvent != nil {
+			onRawEvent()
 		}
 
 		debugPretty(debugOut, "raw sse event", event)
@@ -413,7 +464,7 @@ func processStream(body io.Reader, events chan<- provider.Event, debugOut io.Wri
 	}
 
 	for scanner.Scan() {
-		line := scanner.Text()
+		line := strings.TrimRight(scanner.Text(), "\r")
 		if line == "" {
 			if err := flush(); err != nil {
 				return err
